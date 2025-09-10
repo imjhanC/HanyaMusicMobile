@@ -1,22 +1,71 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { View, TouchableOpacity } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import NetInfo from "@react-native-community/netinfo";
 
 // Import screens
 import Home from "./screens/Home";
 import Playlist from "./screens/Playlist";
 import SearchScreen from "./screens/SearchScreen";
+import NoInternetScreen from "./screens/NoInternetScreen";
 
 // Import music player components
 import { GlobalMusicPlayer, MusicPlayerProvider } from "./services/MusicPlayer";
 
-
-
 const Tab = createBottomTabNavigator();
 
 export default function App() {
+  const [isConnected, setIsConnected] = useState<boolean | null>(true);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(false);
+
+  useEffect(() => {
+    // Subscribe to network state updates
+    const unsubscribe = NetInfo.addEventListener(state => {
+      // Check if we have internet access, not just network connection
+      const connected = state.isConnected && state.isInternetReachable !== false;
+      setIsConnected(connected);
+    });
+
+    // Get initial network state
+    NetInfo.fetch().then(state => {
+      const connected = state.isConnected && state.isInternetReachable !== false;
+      setIsConnected(connected);
+    });
+
+    // Cleanup subscription
+    return () => unsubscribe();
+  }, []);
+
+  const handleRetry = async () => {
+    setIsCheckingConnection(true);
+    
+    try {
+      // Force refresh network state
+      const state = await NetInfo.refresh();
+      const connected = state.isConnected && state.isInternetReachable !== false;
+      setIsConnected(connected);
+    } catch (error) {
+      console.log('Network check failed:', error);
+      setIsConnected(false);
+    } finally {
+      setTimeout(() => {
+        setIsCheckingConnection(false);
+      }, 1000); // Small delay to show user that we're checking
+    }
+  };
+
+  // Show NoInternetScreen if there's no connection
+  if (isConnected === false) {
+    return (
+      <MusicPlayerProvider>
+        <NoInternetScreen onRetry={handleRetry} />
+      </MusicPlayerProvider>
+    );
+  }
+
+  // Show main app when connected
   return (
     <MusicPlayerProvider>
       <NavigationContainer>
@@ -34,7 +83,7 @@ export default function App() {
               },
               tabBarIcon: ({ color, size, focused }) => {
                 let iconName;
-                
+
                 if (route.name === "Home") {
                   iconName = focused ? "home" : "home-outline";
                 } else if (route.name === "Playlist") {
@@ -42,7 +91,7 @@ export default function App() {
                 } else if (route.name === "Search") {
                   iconName = focused ? "search" : "search-outline";
                 }
-                
+
                 return <Ionicons name={iconName} size={28} color={color} />;
               },
               tabBarLabelStyle: {

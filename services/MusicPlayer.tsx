@@ -87,11 +87,11 @@ export const GlobalMusicPlayer = () => {
           disabled={isLoading}
         >
           {isLoading ? (
-            <Ionicons name="hourglass" size={28} color="#999" />
+            <Ionicons name="hourglass" size={32} color="#999" />
           ) : (
             <Ionicons 
               name={iconName}
-              size={28} 
+              size={32} 
               color="#fff" 
             />
           )}
@@ -183,13 +183,13 @@ const styles = StyleSheet.create({
   globalPlayerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    padding: 8,
   },
   playerThumbnail: {
-    width: 40,
-    height: 40,
-    borderRadius: 4,
-    marginRight: 10,
+    width: 55,
+    height: 55,
+    borderRadius: 6,
+    marginRight: 12,
   },
   playerInfo: {
     flex: 1,
@@ -197,17 +197,17 @@ const styles = StyleSheet.create({
   },
   playerTitle: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   playerArtist: {
     color: '#aaa',
-    fontSize: 12,
+    fontSize: 14,
   },
   controlButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#333',
     justifyContent: 'center',
     alignItems: 'center',
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#222',
   },
   progressContainer: {
-    height: 2,
+    height: 4,
     backgroundColor: '#333',
     width: '100%',
   },
