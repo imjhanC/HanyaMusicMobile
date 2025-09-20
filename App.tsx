@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, TouchableOpacity } from "react-native";
+import { View, TouchableOpacity, Dimensions } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createDrawerNavigator } from "@react-navigation/drawer";
@@ -17,6 +17,7 @@ import { GlobalMusicPlayer, MusicPlayerProvider } from "./services/MusicPlayer";
 
 const Tab = createBottomTabNavigator();
 const Drawer = createDrawerNavigator();
+const { width } = Dimensions.get("window");
 
 // ✅ Create a custom header with the user icon
 function CustomHeader({ navigation }: any) {
@@ -76,13 +77,13 @@ function BottomTabs() {
   );
 }
 
-// ✅ Drawer Navigator (sidebar)
+// Drawer Navigator (sidebar)
 function DrawerNavigator() {
   return (
     <Drawer.Navigator
       screenOptions={{
         headerShown: false,
-        drawerStyle: { backgroundColor: "#1e1e1e", width: 240 },
+        drawerStyle: { backgroundColor: "#1e1e1e", width: width * 0.9 },
         drawerLabelStyle: { color: "#fff" },
       }}
     >

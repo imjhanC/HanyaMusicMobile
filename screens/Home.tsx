@@ -5,9 +5,6 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 const Home = () => {
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.userIcon}>
-        <Ionicons name="person-circle-outline" size={50} color="#fff" />
-      </TouchableOpacity>
     </View>
   );
 };
