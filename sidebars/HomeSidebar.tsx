@@ -18,11 +18,10 @@ import { BottomTabs } from "../App";
 const Drawer = createDrawerNavigator();
 const { width } = Dimensions.get("window");
 
-// 🎨 Custom Drawer Content
 function CustomDrawerContent(props: any) {
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
-      {/* 👤 Profile Section */}
+      {/* Profile Section */}
       <View style={styles.profileSection}>
         <Image
           source={{ uri: "https://i.pinimg.com/736x/4b/f3/b8/4bf3b84b3662652a68d7c9d47ad2ab4c.jpg" }} // fake avatar
@@ -32,7 +31,7 @@ function CustomDrawerContent(props: any) {
         <Text style={styles.email}>karina@sm.com</Text>
       </View>
 
-      {/* 📋 Menu Items */}
+      {/* Menu Items */}
       <View style={styles.menuSection}>
         <DrawerItem
           label="Menu"
@@ -54,7 +53,7 @@ function CustomDrawerContent(props: any) {
         />
       </View>
 
-      {/* 🚪 Logout Section */}
+      {/* Logout Section */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.logoutButton}
@@ -85,7 +84,6 @@ export default function HomeSidebar() {
   );
 }
 
-// 🎨 Styles
 const styles = StyleSheet.create({
   profileSection: {
     padding: 20,
