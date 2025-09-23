@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -12,12 +12,11 @@ import {
   ActivityIndicator,
   StatusBar,
 } from 'react-native';
-import { useMusicPlayer } from '../services/MusicPlayer'; 
+import { useMusicPlayer } from '../services/MusicPlayer';
+import { useNavigation } from '@react-navigation/native';
 
-// Define the base URL for your FastAPI backend
 const API_BASE_URL = 'https://instinctually-monosodium-shawnda.ngrok-free.app';
 
-// Define the types for our data
 interface SearchResult {
   title: string;
   thumbnail_url: string;
@@ -30,9 +29,18 @@ const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Use the global music player context
-  const { playTrack } = useMusicPlayer();
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
+  const { playTrack, currentTrack } = useMusicPlayer(); // assumes you have currentTrack
+  const navigation = useNavigation();
+
+  // ✅ Hide/show header based on states
+  useEffect(() => {
+    const shouldHideHeader =
+      isInputFocused || isLoading || searchResults.length > 0 || !!currentTrack;
+
+    navigation.setOptions({ headerShown: !shouldHideHeader });
+  }, [isInputFocused, isLoading, searchResults, currentTrack, navigation]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -71,6 +79,8 @@ const SearchScreen = () => {
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={handleSearch}
+          onFocus={() => setIsInputFocused(true)}
+          onBlur={() => setIsInputFocused(false)}
         />
         <Button title="Search" onPress={handleSearch} color="#1DB954" />
       </View>
@@ -94,15 +104,8 @@ const SearchScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#121212',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    padding: 10,
-    backgroundColor: '#282828',
-  },
+  container: { flex: 1, backgroundColor: '#121212' },
+  searchContainer: { flexDirection: 'row', padding: 10, backgroundColor: '#282828' },
   searchInput: {
     flex: 1,
     height: 40,
@@ -112,47 +115,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginRight: 10,
   },
-  loader: {
-    marginTop: 50,
-  },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: 50,
-    color: '#aaa',
-  },
+  loader: { marginTop: 50 },
+  emptyText: { textAlign: 'center', marginTop: 50, color: '#aaa' },
   trackItem: {
     flexDirection: 'row',
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
-  thumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 4,
-    marginRight: 10,
-  },
-  trackInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  trackTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  trackUploader: {
-    color: '#aaa',
-    fontSize: 14,
-  },
-  trackDuration: {
-    color: '#aaa',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  flatListContent: {
-    paddingBottom: 140, // Add padding to account for the global player + tab bar
-  },
+  thumbnail: { width: 60, height: 60, borderRadius: 4, marginRight: 10 },
+  trackInfo: { flex: 1, justifyContent: 'center' },
+  trackTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  trackUploader: { color: '#aaa', fontSize: 14 },
+  trackDuration: { color: '#aaa', fontSize: 12, marginTop: 4 },
+  flatListContent: { paddingBottom: 140 },
 });
 
 export default SearchScreen;
