@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  SafeAreaView,
   View,
   TextInput,
   Button,
@@ -11,7 +10,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   StatusBar,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMusicPlayer } from '../services/MusicPlayer';
 import { useNavigation } from '@react-navigation/native';
 
@@ -30,24 +31,32 @@ const SearchScreen = () => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
-
-  const { playTrack, currentTrack } = useMusicPlayer(); // assumes you have currentTrack
+  const { playTrack, currentTrack } = useMusicPlayer();
   const navigation = useNavigation();
 
   // ✅ Hide/show header based on states
   useEffect(() => {
     const shouldHideHeader =
       isInputFocused || isLoading || searchResults.length > 0 || !!currentTrack;
-
     navigation.setOptions({ headerShown: !shouldHideHeader });
   }, [isInputFocused, isLoading, searchResults, currentTrack, navigation]);
+
+  // ✅ Handle status bar color consistently
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      StatusBar.setBackgroundColor('#121212', true);
+      StatusBar.setBarStyle('light-content', true);
+    }
+  }, [isInputFocused]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setIsLoading(true);
     setSearchResults([]);
     try {
-      const response = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(searchQuery)}`);
+      const response = await fetch(
+        `${API_BASE_URL}/search?q=${encodeURIComponent(searchQuery)}`
+      );
       const data = await response.json();
       setSearchResults(data);
     } catch (error) {
@@ -57,11 +66,29 @@ const SearchScreen = () => {
     }
   };
 
+  const handleInputFocus = () => {
+    setIsInputFocused(true);
+    // Keep status bar consistent
+    if (Platform.OS === 'android') {
+      StatusBar.setBackgroundColor('#282828', true);
+    }
+  };
+
+  const handleInputBlur = () => {
+    setIsInputFocused(false);
+    // Reset status bar
+    if (Platform.OS === 'android') {
+      StatusBar.setBackgroundColor('#121212', true);
+    }
+  };
+
   const renderSearchResult = ({ item }: { item: SearchResult }) => (
     <TouchableOpacity style={styles.trackItem} onPress={() => playTrack(item)}>
       <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} />
       <View style={styles.trackInfo}>
-        <Text style={styles.trackTitle} numberOfLines={2}>{item.title}</Text>
+        <Text style={styles.trackTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
         <Text style={styles.trackUploader}>{item.uploader}</Text>
         <Text style={styles.trackDuration}>{item.duration}</Text>
       </View>
@@ -69,9 +96,14 @@ const SearchScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <View style={styles.searchContainer}>
+    <View style={styles.container}>
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor="#121212"
+        translucent={false}
+      />
+      {/* ✅ Search container - moves up when header disappears */}
+      <SafeAreaView style={styles.searchContainer} edges={['top', 'left', 'right']}>
         <TextInput
           style={styles.searchInput}
           placeholder="Search for a song..."
@@ -79,56 +111,146 @@ const SearchScreen = () => {
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={handleSearch}
-          onFocus={() => setIsInputFocused(true)}
-          onBlur={() => setIsInputFocused(false)}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
         />
-        <Button title="Search" onPress={handleSearch} color="#1DB954" />
-      </View>
+        <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+          <Text style={styles.searchButtonText}>SEARCH</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
 
-      {isLoading ? (
-        <ActivityIndicator size="large" color="#1DB954" style={styles.loader} />
-      ) : (
-        <FlatList
-          data={searchResults}
-          renderItem={renderSearchResult}
-          keyExtractor={(item) => item.videoId}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No results found. Start by searching for a song.</Text>
-          }
-          contentContainerStyle={styles.flatListContent}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </SafeAreaView>
+      {/* ✅ Content area */}
+      <SafeAreaView style={styles.contentArea} edges={['left', 'right', 'bottom']}>
+        {isLoading ? (
+          <ActivityIndicator size="large" color="#1DB954" style={styles.loader} />
+        ) : (
+          <FlatList
+            data={searchResults}
+            renderItem={renderSearchResult}
+            keyExtractor={(item) => item.videoId}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                No results found. Start by searching for a song.
+              </Text>
+            }
+            contentContainerStyle={styles.flatListContent}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  searchContainer: { flexDirection: 'row', padding: 10, backgroundColor: '#282828' },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#121212' 
+  },
+  
+  // ✅ Custom header styles
+  headerArea: {
+    backgroundColor: '#121212',
+  },
+  customHeader: {
+    height: 56,
+    backgroundColor: '#121212',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottomWidth: 0, // Remove any border
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  
+  // ✅ Search container - no margins/padding that create gaps
+  searchContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#282828',
+    alignItems: 'center',
+    marginTop: 0,
+    borderTopWidth: 0,
+  },
+  searchContainerFocused: {
+    paddingTop: 0, 
+    paddingBottom: 12, // Extra padding when it moves to top
+  },
   searchInput: {
     flex: 1,
     height: 40,
-    backgroundColor: '#333',
-    borderRadius: 5,
-    paddingHorizontal: 10,
+    backgroundColor: '#404040',
+    borderRadius: 20,
+    paddingHorizontal: 16,
     color: '#fff',
-    marginRight: 10,
+    fontSize: 16,
+    marginRight: 12,
   },
-  loader: { marginTop: 50 },
-  emptyText: { textAlign: 'center', marginTop: 50, color: '#aaa' },
+  searchButton: {
+    backgroundColor: '#1DB954',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  searchButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  
+  // ✅ Content area
+  contentArea: {
+    flex: 1,
+    backgroundColor: '#121212',
+  },
+  loader: { 
+    marginTop: 50 
+  },
+  emptyText: { 
+    textAlign: 'center', 
+    marginTop: 50, 
+    color: '#aaa',
+    fontSize: 16,
+    paddingHorizontal: 20,
+  },
   trackItem: {
     flexDirection: 'row',
-    padding: 10,
+    padding: 12,
+    backgroundColor: '#121212',
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
-  thumbnail: { width: 60, height: 60, borderRadius: 4, marginRight: 10 },
-  trackInfo: { flex: 1, justifyContent: 'center' },
-  trackTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  trackUploader: { color: '#aaa', fontSize: 14 },
-  trackDuration: { color: '#aaa', fontSize: 12, marginTop: 4 },
-  flatListContent: { paddingBottom: 140 },
+  thumbnail: { 
+    width: 60, 
+    height: 60, 
+    borderRadius: 4, 
+    marginRight: 12 
+  },
+  trackInfo: { 
+    flex: 1, 
+    justifyContent: 'center' 
+  },
+  trackTitle: { 
+    color: '#fff', 
+    fontSize: 16, 
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  trackUploader: { 
+    color: '#aaa', 
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  trackDuration: { 
+    color: '#aaa', 
+    fontSize: 12 
+  },
+  flatListContent: { 
+    paddingBottom: 140 
+  },
 });
 
 export default SearchScreen;

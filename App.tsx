@@ -39,11 +39,11 @@ export function BottomTabs() {
         headerLeft: () => <CustomHeader navigation={navigation} />,
         tabBarStyle: {
           position: "absolute",
-          height: 70,
+          height: 90,
           backgroundColor: "rgba(0, 0, 0, 0.95)",
           borderTopWidth: 0,
           elevation: 0,
-          paddingTop: 10,
+          paddingTop: 13,
         },
         tabBarIcon: ({ color, focused }) => {
           let iconName;
