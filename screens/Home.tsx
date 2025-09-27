@@ -12,7 +12,7 @@ const Home = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#292929ff", // Dark background
+    backgroundColor: "#121212", // Dark background
   },
   userIcon: {
     position: "absolute",

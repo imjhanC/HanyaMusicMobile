@@ -4,12 +4,13 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import NetInfo from "@react-native-community/netinfo";
-
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 // Screens
 import Home from "./screens/Home";
 import Playlist from "./screens/Playlist";
-import SearchScreen from "./screens/SearchScreen";
+import SearchScreen from "./screens/SearchScreen/SearchScreen";
 import NoInternetScreen from "./screens/NoInternetScreen";
+import SearchScreenAdv from "./screens/SearchScreen/SearchScreenAdv";
 
 // Music Player
 import { GlobalMusicPlayer, MusicPlayerProvider } from "./services/MusicPlayer";
@@ -18,6 +19,7 @@ import { GlobalMusicPlayer, MusicPlayerProvider } from "./services/MusicPlayer";
 import HomeSidebar from "./sidebars/HomeSidebar";
 
 const Tab = createBottomTabNavigator();
+const SearchStack = createNativeStackNavigator();
 
 // ✅ Custom header with user icon
 function CustomHeader({ navigation }: any) {
@@ -28,15 +30,44 @@ function CustomHeader({ navigation }: any) {
   );
 }
 
-// ✅ Bottom Tabs (stay here)
+function SearchStackNavigator({ navigation }: any) {
+  return (
+    <SearchStack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: "#121212" },
+        headerTintColor: "#fff",
+        headerTitleAlign: "center",
+      }}
+    >
+      <SearchStack.Screen 
+        name="Search"   // ✅ keep the stack screen as "Search"
+        component={SearchScreen}  
+        options={{ 
+          headerShown: true,
+          headerLeft: () => <CustomHeader navigation={navigation} />
+        }} 
+      />
+      <SearchStack.Screen 
+        name="SearchAdv" 
+        component={SearchScreenAdv}  
+        options={{ 
+          headerShown: false // No header at all for SearchScreenAdv
+        }} 
+      />
+    </SearchStack.Navigator>
+  );
+}
+
+// ✅ Bottom Tabs
 export function BottomTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
-        headerStyle: { backgroundColor: "#292929ff" },
+        headerStyle: { backgroundColor: "#121212" },
         headerTintColor: "#fff",
         headerTitleAlign: "center",
-        headerLeft: () => <CustomHeader navigation={navigation} />,
+        headerShown: route.name !== "SearchTab",  // Hide tab header for Search
+        headerLeft: route.name !== "SearchTab" ? () => <CustomHeader navigation={navigation} /> : undefined,
         tabBarStyle: {
           position: "absolute",
           height: 90,
@@ -49,7 +80,7 @@ export function BottomTabs() {
           let iconName;
           if (route.name === "Home") iconName = focused ? "home" : "home-outline";
           else if (route.name === "Playlist") iconName = focused ? "list" : "list-outline";
-          else if (route.name === "Search") iconName = focused ? "search" : "search-outline";
+          else if (route.name === "SearchTab") iconName = focused ? "search" : "search-outline"; // ✅ updated
           return <Ionicons name={iconName} size={28} color={color} />;
         },
         tabBarLabelStyle: {
@@ -63,10 +94,15 @@ export function BottomTabs() {
     >
       <Tab.Screen name="Home" component={Home} />
       <Tab.Screen name="Playlist" component={Playlist} />
-      <Tab.Screen name="Search" component={SearchScreen} />
+      <Tab.Screen 
+        name="SearchTab"   // ✅ unique internal name
+        children={({ navigation }) => <SearchStackNavigator navigation={navigation} />} 
+        options={{ title: "Search" }} // ✅ still shows "Search" to the user
+      />
     </Tab.Navigator>
   );
 }
+
 
 export default function App() {
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
