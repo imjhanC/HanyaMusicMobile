@@ -14,6 +14,7 @@ import SearchScreenAdv from "./screens/SearchScreen/SearchScreenAdv";
 
 // Music Player
 import { GlobalMusicPlayer, MusicPlayerProvider } from "./services/MusicPlayer";
+import MusicPlayerAdv from "./services/MusicPlayerAdv";
 
 // Sidebar
 import HomeSidebar from "./sidebars/HomeSidebar";
@@ -149,6 +150,7 @@ export default function App() {
       <NavigationContainer>
         <View style={{ flex: 1 }}>
           <HomeSidebar />
+          <MusicPlayerAdv />
           <GlobalMusicPlayer />
         </View>
       </NavigationContainer>

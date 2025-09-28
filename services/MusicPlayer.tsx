@@ -21,7 +21,7 @@ export const useMusicPlayer = () => {
 
 // Global Player Component
 export const GlobalMusicPlayer = () => {
-  const { currentTrack, isTrackLoading, isTransitioning } = useMusicPlayer();
+  const { currentTrack, isTrackLoading, isTransitioning, openAdv, isAdvOpen } = useMusicPlayer();
   const playbackState = usePlaybackState();
   const { position, duration } = useProgress();
   const [isToggling, setIsToggling] = useState(false);
@@ -45,7 +45,7 @@ export const GlobalMusicPlayer = () => {
     }
   };
 
-  if (!currentTrack) return null;
+  if (!currentTrack || isAdvOpen) return null;
 
   const isPlaying = playbackState?.state === State.Playing && !isTransitioning;
   const showLoading = isTrackLoading || isTransitioning;
@@ -53,11 +53,13 @@ export const GlobalMusicPlayer = () => {
   return (
     <View style={styles.globalPlayerWrapper}>
       <View style={styles.globalPlayerContainer}>
-        <Image source={{ uri: currentTrack.thumbnail_url }} style={styles.playerThumbnail} />
-        <View style={styles.playerInfo}>
-          <MarqueeTitle text={currentTrack.title} textStyle={styles.playerTitle} delay={2000} />
-          <Text style={styles.playerArtist} numberOfLines={1}>{currentTrack.uploader}</Text>
-        </View>
+        <TouchableOpacity style={styles.tapZone} onPress={openAdv} activeOpacity={0.9}>
+          <Image source={{ uri: currentTrack.thumbnail_url }} style={styles.playerThumbnail} />
+          <View style={styles.playerInfo}>
+            <MarqueeTitle text={currentTrack.title} textStyle={styles.playerTitle} delay={2000} />
+            <Text style={styles.playerArtist} numberOfLines={1}>{currentTrack.uploader}</Text>
+          </View>
+        </TouchableOpacity>
         <TouchableOpacity
           onPress={togglePlayPause}
           style={[styles.controlButton, (isToggling || showLoading) && styles.controlButtonDisabled]}
@@ -85,6 +87,7 @@ export const MusicPlayerProvider = ({ children }) => {
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isAdvOpen, setIsAdvOpen] = useState(false);
 
   const setupPlayer = async () => {
     try {
@@ -219,7 +222,10 @@ export const MusicPlayerProvider = ({ children }) => {
       setCurrentTrack, 
       playTrack, 
       isTrackLoading, 
-      isTransitioning 
+      isTransitioning,
+      isAdvOpen,
+      openAdv: () => setIsAdvOpen(true),
+      closeAdv: () => setIsAdvOpen(false),
     }}>
       {children}
     </MusicPlayerContext.Provider>
@@ -336,5 +342,10 @@ const styles = StyleSheet.create({
   progressBar: {
     height: "100%",
     backgroundColor: "#1DB954",
+  },
+  tapZone: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
   },
 });
