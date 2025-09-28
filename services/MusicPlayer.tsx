@@ -230,7 +230,7 @@ export const MusicPlayerProvider = ({ children }) => {
 const styles = StyleSheet.create({
   globalPlayerWrapper: {
     position: "absolute",
-    bottom: 70,
+    bottom: 80,
     left: 0,
     right: 0,
     backgroundColor: "rgba(20, 20, 20, 0.98)",
