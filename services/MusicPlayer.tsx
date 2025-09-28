@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { View, TouchableOpacity, Text, Image, StyleSheet, ActivityIndicator } from "react-native";
+import { View, TouchableOpacity, Text, Image, StyleSheet, ActivityIndicator, Animated, Easing } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import TrackPlayer, {
   Capability,
@@ -55,7 +55,7 @@ export const GlobalMusicPlayer = () => {
       <View style={styles.globalPlayerContainer}>
         <Image source={{ uri: currentTrack.thumbnail_url }} style={styles.playerThumbnail} />
         <View style={styles.playerInfo}>
-          <Text style={styles.playerTitle} numberOfLines={1}>{currentTrack.title}</Text>
+          <MarqueeTitle text={currentTrack.title} textStyle={styles.playerTitle} delay={2000} />
           <Text style={styles.playerArtist} numberOfLines={1}>{currentTrack.uploader}</Text>
         </View>
         <TouchableOpacity
@@ -226,6 +226,62 @@ export const MusicPlayerProvider = ({ children }) => {
   );
 };
 
+// Title Marquee Component (scrolls left if text is too long)
+const MarqueeTitle = ({ text, textStyle, delay = 2000 }) => {
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [contentWidth, setContentWidth] = useState(0);
+  const translateX = React.useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (containerWidth > 0 && contentWidth > containerWidth) {
+      const distance = contentWidth - containerWidth;
+      const duration = Math.max(1500, distance * 15);
+
+      const animation = Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay), // wait before starting
+          Animated.timing(translateX, {
+            toValue: -distance,
+            duration,
+            easing: Easing.linear,
+            useNativeDriver: true,
+          }),
+          Animated.delay(1000), // wait at the end
+          Animated.timing(translateX, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      animation.start();
+      return () => {
+        animation.stop();
+        translateX.setValue(0);
+      };
+    } else {
+      // reset if short text
+      translateX.stopAnimation();
+      translateX.setValue(0);
+    }
+  }, [containerWidth, contentWidth, text, delay]);
+
+  return (
+    <View
+      style={{ overflow: "hidden" }}
+      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+    >
+      <Animated.View
+        style={{ transform: [{ translateX }] }}
+        onLayout={(e) => setContentWidth(e.nativeEvent.layout.width)}
+      >
+        <Text style={textStyle}>{text}</Text>
+      </Animated.View>
+    </View>
+  );
+};
+
 // Styles
 const styles = StyleSheet.create({
   globalPlayerWrapper: {
@@ -233,7 +289,7 @@ const styles = StyleSheet.create({
     bottom: 80,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(20, 20, 20, 0.98)",
+    backgroundColor: "rgba(32, 32, 32, 0.98)",
     borderTopWidth: 1,
     borderTopColor: "#333",
   },
