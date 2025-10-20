@@ -20,7 +20,7 @@ export const useMusicPlayer = () => {
 };
 
 // Global Player Component
-export const GlobalMusicPlayer = () => {
+export const GlobalMusicPlayer = ({ drawerProgress }) => {
   const { currentTrack, isTrackLoading, isTransitioning, openAdv, isAdvOpen } = useMusicPlayer();
   const playbackState = usePlaybackState();
   const { position, duration } = useProgress();
@@ -50,8 +50,43 @@ export const GlobalMusicPlayer = () => {
   const isPlaying = playbackState?.state === State.Playing && !isTransitioning;
   const showLoading = isTrackLoading || isTransitioning;
 
+  // Check if drawerProgress exists and has interpolate method
+  const hasDrawerProgress = drawerProgress && typeof drawerProgress.interpolate === 'function';
+
+  // Animate opacity based on drawer progress
+  const opacity = hasDrawerProgress ? drawerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  }) : 1;
+
+  // Animate scale for a subtle shrinking effect
+  const scale = hasDrawerProgress ? drawerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.95],
+  }) : 1;
+
+  // Determine pointer events - disable when drawer is open
+  const getPointerEvents = () => {
+    if (!hasDrawerProgress) return "auto";
+    try {
+      const progressValue = drawerProgress.__getValue();
+      return progressValue > 0.5 ? "none" : "auto";
+    } catch (e) {
+      return "auto";
+    }
+  };
+
   return (
-    <View style={styles.globalPlayerWrapper}>
+    <Animated.View 
+      style={[
+        styles.globalPlayerWrapper,
+        hasDrawerProgress ? {
+          opacity,
+          transform: [{ scale }],
+        } : {}
+      ]}
+      pointerEvents={getPointerEvents()}
+    >
       <View style={styles.globalPlayerContainer}>
         <TouchableOpacity style={styles.tapZone} onPress={openAdv} activeOpacity={0.9}>
           <Image source={{ uri: currentTrack.thumbnail_url }} style={styles.playerThumbnail} />
@@ -78,7 +113,7 @@ export const GlobalMusicPlayer = () => {
       <View style={styles.progressContainer}>
         <View style={[styles.progressBar, { width: `${(position / duration) * 100 || 0}%` }]} />
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -91,7 +126,10 @@ export const MusicPlayerProvider = ({ children }) => {
 
   const setupPlayer = async () => {
     try {
-      await TrackPlayer.setupPlayer();
+      await TrackPlayer.setupPlayer({
+        waitForBuffer: true, // remove this if got any problems
+        autoHandleInterruptions: true, // <-- This keeps playback running when the app is minimized
+      });
       await TrackPlayer.updateOptions({
         capabilities: [
           Capability.Play,
@@ -123,10 +161,10 @@ export const MusicPlayerProvider = ({ children }) => {
       }
 
       await TrackPlayer.pause();
-      await TrackPlayer.setVolume(1); // Reset volume for next track
+      await TrackPlayer.setVolume(1);
     } catch (error) {
       console.error("Error fading out track:", error);
-      await TrackPlayer.setVolume(1); // Reset volume on error
+      await TrackPlayer.setVolume(1);
     }
   };
 
@@ -145,10 +183,10 @@ export const MusicPlayerProvider = ({ children }) => {
         await new Promise(resolve => setTimeout(resolve, stepDuration));
       }
 
-      await TrackPlayer.setVolume(1); // Ensure full volume
+      await TrackPlayer.setVolume(1);
     } catch (error) {
       console.error("Error fading in track:", error);
-      await TrackPlayer.setVolume(1); // Reset volume on error
+      await TrackPlayer.setVolume(1);
     }
   };
 
@@ -156,23 +194,17 @@ export const MusicPlayerProvider = ({ children }) => {
     try {
       const API_BASE_URL = "https://instinctually-monosodium-shawnda.ngrok-free.app";
       
-      // Check if there's a current track playing
       const currentState = await TrackPlayer.getState();
       const hasCurrentTrack = currentTrack && currentState === State.Playing;
 
       if (hasCurrentTrack) {
-        // Start transition state
         setIsTransitioning(true);
-        
-        // Fade out current track
         await fadeOutCurrentTrack(800);
       }
 
-      // Show new track immediately
       setCurrentTrack(track);
       setIsTrackLoading(true);
 
-      // Fetch stream data for new track
       const response = await fetch(`${API_BASE_URL}/stream/${track.videoId}`);
       const streamData = await response.json();
 
@@ -192,17 +224,15 @@ export const MusicPlayerProvider = ({ children }) => {
         await TrackPlayer.add(trackConfig);
         
         if (hasCurrentTrack) {
-          // Fade in new track
           await fadeInNewTrack(800);
         } else {
-          // Just play normally if no previous track
           await TrackPlayer.play();
         }
       }
     } catch (error) {
       console.error("Error playing track:", error);
       setCurrentTrack(null);
-      await TrackPlayer.setVolume(1); // Reset volume on error
+      await TrackPlayer.setVolume(1);
     } finally {
       setIsTrackLoading(false);
       setIsTransitioning(false);
@@ -232,7 +262,7 @@ export const MusicPlayerProvider = ({ children }) => {
   );
 };
 
-// Title Marquee Component (scrolls left if text is too long)
+// Title Marquee Component
 const MarqueeTitle = ({ text, textStyle, delay = 2000 }) => {
   const [containerWidth, setContainerWidth] = useState(0);
   const [contentWidth, setContentWidth] = useState(0);
@@ -245,14 +275,14 @@ const MarqueeTitle = ({ text, textStyle, delay = 2000 }) => {
 
       const animation = Animated.loop(
         Animated.sequence([
-          Animated.delay(delay), // wait before starting
+          Animated.delay(delay),
           Animated.timing(translateX, {
             toValue: -distance,
             duration,
             easing: Easing.linear,
             useNativeDriver: true,
           }),
-          Animated.delay(1000), // wait at the end
+          Animated.delay(1000),
           Animated.timing(translateX, {
             toValue: 0,
             duration: 0,
@@ -267,7 +297,6 @@ const MarqueeTitle = ({ text, textStyle, delay = 2000 }) => {
         translateX.setValue(0);
       };
     } else {
-      // reset if short text
       translateX.stopAnimation();
       translateX.setValue(0);
     }
@@ -327,7 +356,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    //backgroundColor: "#333",
     justifyContent: "center",
     alignItems: "center",
   },

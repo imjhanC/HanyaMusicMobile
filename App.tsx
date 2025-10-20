@@ -5,12 +5,14 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import NetInfo from "@react-native-community/netinfo";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // Screens
 import Home from "./screens/Home";
 import Playlist from "./screens/Playlist";
 import SearchScreen from "./screens/SearchScreen/SearchScreen";
 import NoInternetScreen from "./screens/NoInternetScreen";
 import SearchScreenAdv from "./screens/SearchScreen/SearchScreenAdv";
+import SplashScreen from './screens/SplashScreen';
 
 // Music Player
 import { GlobalMusicPlayer, MusicPlayerProvider } from "./services/MusicPlayer";
@@ -22,7 +24,9 @@ import HomeSidebar from "./sidebars/HomeSidebar";
 const Tab = createBottomTabNavigator();
 const SearchStack = createNativeStackNavigator();
 
-// ✅ Custom header with user icon
+const SPLASH_SHOWN_KEY = '@splash_shown';
+
+// Custom header with user icon
 function CustomHeader({ navigation }: any) {
   return (
     <TouchableOpacity style={{ marginLeft: 16 }} onPress={() => navigation.openDrawer()}>
@@ -41,7 +45,7 @@ function SearchStackNavigator({ navigation }: any) {
       }}
     >
       <SearchStack.Screen 
-        name="Search"   // ✅ keep the stack screen as "Search"
+        name="Search"  
         component={SearchScreen}  
         options={{ 
           headerShown: true,
@@ -52,14 +56,14 @@ function SearchStackNavigator({ navigation }: any) {
         name="SearchAdv" 
         component={SearchScreenAdv}  
         options={{ 
-          headerShown: false // No header at all for SearchScreenAdv
+          headerShown: false
         }} 
       />
     </SearchStack.Navigator>
   );
 }
 
-// ✅ Bottom Tabs
+// Bottom Tabs
 export function BottomTabs() {
   return (
     <Tab.Navigator
@@ -67,7 +71,7 @@ export function BottomTabs() {
         headerStyle: { backgroundColor: "#121212" },
         headerTintColor: "#fff",
         headerTitleAlign: "center",
-        headerShown: route.name !== "SearchTab",  // Hide tab header for Search
+        headerShown: route.name !== "SearchTab",
         headerLeft: route.name !== "SearchTab" ? () => <CustomHeader navigation={navigation} /> : undefined,
         tabBarStyle: {
           position: "absolute",
@@ -81,7 +85,7 @@ export function BottomTabs() {
           let iconName;
           if (route.name === "Home") iconName = focused ? "home" : "home-outline";
           else if (route.name === "Playlist") iconName = focused ? "list" : "list-outline";
-          else if (route.name === "SearchTab") iconName = focused ? "search" : "search-outline"; // ✅ updated
+          else if (route.name === "SearchTab") iconName = focused ? "search" : "search-outline";
           return <Ionicons name={iconName} size={28} color={color} />;
         },
         tabBarLabelStyle: {
@@ -96,9 +100,9 @@ export function BottomTabs() {
       <Tab.Screen name="Home" component={Home} />
       <Tab.Screen name="Playlist" component={Playlist} />
       <Tab.Screen 
-        name="SearchTab"   // ✅ unique internal name
+        name="SearchTab"  
         children={({ navigation }) => <SearchStackNavigator navigation={navigation} />} 
-        options={{ title: "Search" }} // ✅ still shows "Search" to the user
+        options={{ title: "Search" }}
       />
     </Tab.Navigator>
   );
@@ -108,6 +112,27 @@ export function BottomTabs() {
 export default function App() {
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
   const [isCheckingConnection, setIsCheckingConnection] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check if splash has been shown before
+  useEffect(() => {
+    const checkSplashStatus = async () => {
+      try {
+        const hasShownSplash = await AsyncStorage.getItem(SPLASH_SHOWN_KEY);
+        if (hasShownSplash === 'true') {
+          // Splash already shown, skip it
+          setShowSplash(false);
+        }
+        setIsLoading(false);
+      } catch (error) {
+        console.log('Error checking splash status:', error);
+        setIsLoading(false);
+      }
+    };
+
+    checkSplashStatus();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
@@ -137,6 +162,22 @@ export default function App() {
     }
   };
 
+  const handleSplashFinish = async () => {
+    try {
+      // Mark splash as shown
+      await AsyncStorage.setItem(SPLASH_SHOWN_KEY, 'true');
+      setShowSplash(false);
+    } catch (error) {
+      console.log('Error saving splash status:', error);
+      setShowSplash(false);
+    }
+  };
+
+  // Show splash screen only on first boot
+  if (isLoading || showSplash) {
+    return <SplashScreen onFinish={handleSplashFinish} />;
+  }
+
   if (isConnected === false) {
     return (
       <MusicPlayerProvider>
@@ -151,7 +192,6 @@ export default function App() {
         <View style={{ flex: 1 }}>
           <HomeSidebar />
           <MusicPlayerAdv />
-          <GlobalMusicPlayer />
         </View>
       </NavigationContainer>
     </MusicPlayerProvider>

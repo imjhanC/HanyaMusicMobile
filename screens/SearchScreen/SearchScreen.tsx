@@ -12,7 +12,7 @@ export default function SearchScreen() {
       <TouchableOpacity
         style={styles.searchContainer}
         activeOpacity={0.8}
-        onPress={() => navigation.navigate("SearchAdv")} // 👈 navigate
+        onPress={() => navigation.navigate("SearchAdv")} 
       >
         <Ionicons
           name="search-outline"

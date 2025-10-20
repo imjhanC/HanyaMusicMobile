@@ -33,7 +33,7 @@ export default function SearchScreenAdv() {
   const navigation = useNavigation();
   const { playTrack } = useMusicPlayer();
 
-  // ✅ Debounced search (1 second delay after typing stops)
+  // Debounced search (1 second delay after typing stops)
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       if (query.trim()) {
@@ -46,7 +46,6 @@ export default function SearchScreenAdv() {
     return () => clearTimeout(delayDebounce);
   }, [query]);
 
-  // ✅ Actual search function
   const handleSearch = async () => {
     if (!query.trim()) return;
     setIsLoading(true);
@@ -64,7 +63,6 @@ export default function SearchScreenAdv() {
     }
   };
 
-  // ✅ Render each track result
   const renderSearchResult = ({ item }: { item: SearchResult }) => (
     <TouchableOpacity style={styles.trackItem} onPress={() => playTrack(item)}>
       <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} />
@@ -78,7 +76,6 @@ export default function SearchScreenAdv() {
     </TouchableOpacity>
   );
 
-  // ✅ Consistent Android status bar style
   useEffect(() => {
     if (Platform.OS === "android") {
       StatusBar.setBackgroundColor("#121212", true);
@@ -90,7 +87,6 @@ export default function SearchScreenAdv() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#121212" />
 
-      {/* 🔍 Custom Search Bar with Back Button */}
       <View style={styles.searchBar}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -109,7 +105,6 @@ export default function SearchScreenAdv() {
         />
       </View>
 
-      {/* 📄 Results Area */}
       <View style={styles.results}>
         {isLoading ? (
           <ActivityIndicator size="large" color="#1DB954" style={styles.loader} />

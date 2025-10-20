@@ -11,12 +11,25 @@ import {
   createDrawerNavigator,
   DrawerContentScrollView,
   DrawerItem,
+  useDrawerProgress,
 } from "@react-navigation/drawer";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { BottomTabs } from "../App";
+import { GlobalMusicPlayer } from "../services/MusicPlayer";
 
 const Drawer = createDrawerNavigator();
 const { width } = Dimensions.get("window");
+
+// Wrapper for BottomTabs that includes the MusicPlayer
+function BottomTabsWithPlayer() {
+  const drawerProgress = useDrawerProgress();
+  return (
+    <>
+      <BottomTabs />
+      <GlobalMusicPlayer drawerProgress={drawerProgress} />
+    </>
+  );
+}
 
 function CustomDrawerContent(props: any) {
   return (
@@ -24,7 +37,7 @@ function CustomDrawerContent(props: any) {
       {/* Profile Section */}
       <View style={styles.profileSection}>
         <Image
-          source={{ uri: "https://i.pinimg.com/736x/4b/f3/b8/4bf3b84b3662652a68d7c9d47ad2ab4c.jpg" }} // fake avatar
+          source={{ uri: "https://i.pinimg.com/736x/4b/f3/b8/4bf3b84b3662652a68d7c9d47ad2ab4c.jpg" }}
           style={styles.avatar}
         />
         <Text style={styles.username}>Karina</Text>
@@ -67,19 +80,18 @@ function CustomDrawerContent(props: any) {
   );
 }
 
-// 🚀 Drawer Navigator
 export default function HomeSidebar() {
   return (
     <Drawer.Navigator
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
         headerShown: false,
-        drawerStyle: { backgroundColor: "#1e1e1e", width: width * 0.95 },
+        drawerStyle: { backgroundColor: "#1e1e1e", width: width * 0.82 },
       }}
     >
-      <Drawer.Screen name="Main" component={BottomTabs} />
-      <Drawer.Screen name="Account" component={BottomTabs} />
-      <Drawer.Screen name="Settings" component={BottomTabs} />
+      <Drawer.Screen name="Main" component={BottomTabsWithPlayer} />
+      <Drawer.Screen name="Account" component={BottomTabsWithPlayer} />
+      <Drawer.Screen name="Settings" component={BottomTabsWithPlayer} />
     </Drawer.Navigator>
   );
 }
@@ -116,7 +128,7 @@ const styles = StyleSheet.create({
   drawerLabel: {
     fontSize: 16,
     marginLeft: -10,
-    color: "#fff", 
+    color: "#fff",
   },
   footer: {
     padding: 20,
