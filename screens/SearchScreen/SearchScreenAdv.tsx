@@ -34,7 +34,7 @@ export default function SearchScreenAdv() {
   const navigation = useNavigation();
   const { playTrack } = useMusicPlayer();
 
-  // 🔎 Debounced search (1 second delay)
+  // Debounced search (1 second delay)
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       if (query.trim()) {
@@ -48,7 +48,7 @@ export default function SearchScreenAdv() {
     return () => clearTimeout(delayDebounce);
   }, [query]);
 
-  // 🔍 Handle search request
+  // Handle search request
   const handleSearch = async () => {
     if (!query.trim()) return;
     setIsLoading(true);
@@ -79,7 +79,6 @@ export default function SearchScreenAdv() {
     }
   };
 
-  // 🎵 Render individual search results
   const renderSearchResult = ({ item }: { item: SearchResult }) => (
     <TouchableOpacity style={styles.trackItem} onPress={() => playTrack(item)}>
       <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} />
@@ -104,7 +103,6 @@ export default function SearchScreenAdv() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#121212" />
 
-      {/* 🔍 Search bar */}
       <View style={styles.searchBar}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -123,7 +121,6 @@ export default function SearchScreenAdv() {
         />
       </View>
 
-      {/* 🎧 Results */}
       <View style={styles.results}>
         {isLoading ? (
           <ActivityIndicator size="large" color="#1DB954" style={styles.loader} />
