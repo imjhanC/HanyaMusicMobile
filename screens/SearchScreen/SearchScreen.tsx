@@ -12,21 +12,21 @@ const SearchScreen = () => {
   };
 
   return (
-    <View style={styles.rcontainer}>
-      <TouchableOpacity 
-        style={styles.searchBarContainer}
-        onPress={handleSearchPress}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search.."
-          placeholderTextColor="#888"
-          editable={false}
-          pointerEvents="none"
-        />
-      </TouchableOpacity>
+    <View style={styles.container}>
+        <TouchableOpacity 
+          style={styles.searchBarContainer}
+          onPress={handleSearchPress}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search.."
+            placeholderTextColor="#888"
+            editable={false}
+            pointerEvents="none"
+          />
+        </TouchableOpacity>
     </View>
   );
 };
