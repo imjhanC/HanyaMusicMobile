@@ -83,11 +83,12 @@ export default function SearchScreenAdv() {
     <TouchableOpacity style={styles.trackItem} onPress={() => playTrack(item)}>
       <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} />
       <View style={styles.trackInfo}>
-        <Text style={styles.trackTitle} numberOfLines={2}>
+        <Text style={styles.trackTitle} numberOfLines={1}>
           {item.title}
         </Text>
-        <Text style={styles.trackUploader}>{item.uploader}</Text>
-        <Text style={styles.trackDuration}>{item.duration}</Text>
+        <Text style={styles.trackMeta}>
+          {item.uploader} • {item.duration}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -215,8 +216,7 @@ const styles = StyleSheet.create({
   trackItem: {
     flexDirection: "row",
     padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#333",
+    backgroundColor: "#121212",
   },
   thumbnail: {
     width: 60,
@@ -231,17 +231,12 @@ const styles = StyleSheet.create({
   trackTitle: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 4,
+    fontWeight: "600",
+    marginBottom: 6,
   },
-  trackUploader: {
+  trackMeta: {
     color: "#aaa",
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  trackDuration: {
-    color: "#aaa",
-    fontSize: 12,
+    fontSize: 13,
   },
   flatListContent: {
     paddingBottom: 140,

@@ -170,6 +170,9 @@ export default function App() {
       <NavigationContainer>
         <View style={{ flex: 1 }}>
           <MainStack />
+          {/* Global Music Player - appears on all screens */}
+          <GlobalMusicPlayer />
+          {/* Advanced Music Player - overlay modal */}
           <MusicPlayerAdv />
         </View>
       </NavigationContainer>
