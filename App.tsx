@@ -6,6 +6,7 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import NetInfo from "@react-native-community/netinfo";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 // Screens
 import Home from "./screens/Home";
 import Playlist from "./screens/Playlist";
@@ -22,7 +23,7 @@ import MusicPlayerAdv from "./services/MusicPlayerAdv";
 import HomeSidebar from "./sidebars/HomeSidebar";
 
 const Tab = createBottomTabNavigator();
-const SearchStack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator();
 
 const SPLASH_SHOWN_KEY = '@splash_shown';
 
@@ -35,34 +36,6 @@ function CustomHeader({ navigation }: any) {
   );
 }
 
-function SearchStackNavigator({ navigation }: any) {
-  return (
-    <SearchStack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: "#121212" },
-        headerTintColor: "#fff",
-        headerTitleAlign: "center",
-      }}
-    >
-      <SearchStack.Screen 
-        name="Search"  
-        component={SearchScreen}  
-        options={{ 
-          headerShown: true,
-          headerLeft: () => <CustomHeader navigation={navigation} />
-        }} 
-      />
-      <SearchStack.Screen 
-        name="SearchAdv" 
-        component={SearchScreenAdv}  
-        options={{ 
-          headerShown: false
-        }} 
-      />
-    </SearchStack.Navigator>
-  );
-}
-
 // Bottom Tabs
 export function BottomTabs() {
   return (
@@ -71,8 +44,8 @@ export function BottomTabs() {
         headerStyle: { backgroundColor: "#121212" },
         headerTintColor: "#fff",
         headerTitleAlign: "center",
-        headerShown: route.name !== "SearchTab",
-        headerLeft: route.name !== "SearchTab" ? () => <CustomHeader navigation={navigation} /> : undefined,
+        headerLeft: () => <CustomHeader navigation={navigation} />,
+        headerLeftContainerStyle: { paddingLeft: 16 }, 
         tabBarStyle: {
           position: "absolute",
           height: 90,
@@ -85,7 +58,7 @@ export function BottomTabs() {
           let iconName;
           if (route.name === "Home") iconName = focused ? "home" : "home-outline";
           else if (route.name === "Playlist") iconName = focused ? "list" : "list-outline";
-          else if (route.name === "SearchTab") iconName = focused ? "search" : "search-outline";
+          else if (route.name === "Search") iconName = focused ? "search" : "search-outline";
           return <Ionicons name={iconName} size={28} color={color} />;
         },
         tabBarLabelStyle: {
@@ -99,15 +72,23 @@ export function BottomTabs() {
     >
       <Tab.Screen name="Home" component={Home} />
       <Tab.Screen name="Playlist" component={Playlist} />
-      <Tab.Screen 
-        name="SearchTab"  
-        children={({ navigation }) => <SearchStackNavigator navigation={navigation} />} 
-        options={{ title: "Search" }}
-      />
+      <Tab.Screen name="Search" component={SearchScreen} />
     </Tab.Navigator>
   );
 }
 
+// Stack Navigator wrapping the tabs
+function MainStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="HomeDrawer" component={HomeSidebar} />
+      <Stack.Screen 
+        name="SearchAdv" 
+        component={SearchScreenAdv}
+      />
+    </Stack.Navigator>
+  );
+}
 
 export default function App() {
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
@@ -121,7 +102,6 @@ export default function App() {
       try {
         const hasShownSplash = await AsyncStorage.getItem(SPLASH_SHOWN_KEY);
         if (hasShownSplash === 'true') {
-          // Splash already shown, skip it
           setShowSplash(false);
         }
         setIsLoading(false);
@@ -164,7 +144,6 @@ export default function App() {
 
   const handleSplashFinish = async () => {
     try {
-      // Mark splash as shown
       await AsyncStorage.setItem(SPLASH_SHOWN_KEY, 'true');
       setShowSplash(false);
     } catch (error) {
@@ -190,7 +169,7 @@ export default function App() {
     <MusicPlayerProvider>
       <NavigationContainer>
         <View style={{ flex: 1 }}>
-          <HomeSidebar />
+          <MainStack />
           <MusicPlayerAdv />
         </View>
       </NavigationContainer>

@@ -119,6 +119,19 @@ export default function SearchScreenAdv() {
           onChangeText={setQuery}
           autoFocus
         />
+        {query.length > 0 && (
+          <TouchableOpacity
+            onPress={() => {
+              setQuery("");
+              setSearchResults([]);
+              setErrorMessage("");
+              navigation.goBack();
+            }}
+            style={styles.clearButton}
+          >
+            <Ionicons name="close-circle" size={22} color="#aaa" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.results}>
@@ -188,6 +201,9 @@ const styles = StyleSheet.create({
     height: 40,
     color: "#fff",
     fontSize: 16,
+  },
+  clearButton: {
+    marginLeft : 6,
   },
   results: {
     flex: 1,

@@ -1,56 +1,60 @@
 import React from "react";
-import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
-import Ionicons from "react-native-vector-icons/Ionicons";
+import { View, StyleSheet, TouchableOpacity, TextInput } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import Ionicons from "react-native-vector-icons/Ionicons";
 
-export default function SearchScreen() {
+const SearchScreen = () => {
   const navigation = useNavigation();
 
-  return (
-    <View style={styles.container}>
-      {/* Fake search bar */}
-      <TouchableOpacity
-        style={styles.searchContainer}
-        activeOpacity={0.8}
-        onPress={() => navigation.navigate("SearchAdv")} 
-      >
-        <Ionicons
-          name="search-outline"
-          size={22}
-          color="#000"
-          style={styles.searchIcon}
-        />
-        <Text style={styles.placeholder}>Search</Text>
-      </TouchableOpacity>
+  const handleSearchPress = () => {
+    // Navigate directly to SearchAdv
+    navigation.navigate("SearchAdv");
+  };
 
-      <View style={styles.content}></View>
+  return (
+    <View style={styles.rcontainer}>
+      <TouchableOpacity 
+        style={styles.searchBarContainer}
+        onPress={handleSearchPress}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search.."
+          placeholderTextColor="#888"
+          editable={false}
+          pointerEvents="none"
+        />
+      </TouchableOpacity>
     </View>
   );
-}
+};
+
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#121212",
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
-  searchContainer: {
+  searchBarContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginTop: 10,
-    borderRadius: 12,
+    backgroundColor: "#282828",
+    borderRadius: 8,
     paddingHorizontal: 12,
     height: 50,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 10,
   },
-  placeholder: {
-    color: "#555",
+  searchInput: {
+    flex: 1,
+    color: "#fff",
     fontSize: 16,
   },
-  content: {
-    flex: 1,
-  },
 });
+
+export default SearchScreen;
