@@ -82,12 +82,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     top: 0,
-    bottom: 90, // leave room for bottom tab
-    justifyContent: "flex-end",
+    bottom: 0,  // Changed from 90 to 0 to cover entire screen
+    backgroundColor: "#121212",  // Add solid background
+    zIndex: 9999,  // Ensure it's on top of everything
   },
   container: {
     flex: 1,
     backgroundColor: "#121212",
+    paddingBottom: 90,  // Add this to account for bottom tab bar
   },
   header: {
     height: 56,

@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useMusicPlayer } from "../../services/MusicPlayer";
 
 const API_BASE_URL = "https://instinctually-monosodium-shawnda.ngrok-free.app";
@@ -32,7 +32,7 @@ export default function SearchScreenAdv() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const navigation = useNavigation();
-  const { playTrack } = useMusicPlayer();
+  const { playTrack , setCurrentScreen} = useMusicPlayer();
 
   // Debounced search (1 second delay)
   useEffect(() => {
@@ -99,6 +99,15 @@ export default function SearchScreenAdv() {
       StatusBar.setBarStyle("light-content", true);
     }
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setCurrentScreen('SearchAdv');
+      return () => {
+        setCurrentScreen(null);
+      };
+    }, [setCurrentScreen])
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>

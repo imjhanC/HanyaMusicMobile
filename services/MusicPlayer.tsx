@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { View, TouchableOpacity, Text, Image, StyleSheet, ActivityIndicator, Animated, Easing } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import TextTicker from "react-native-text-ticker";
 import TrackPlayer, {
   Capability,
   State,
@@ -21,7 +22,7 @@ export const useMusicPlayer = () => {
 
 // Global Player Component
 export const GlobalMusicPlayer = ({ drawerProgress }) => {
-  const { currentTrack, isTrackLoading, isTransitioning, openAdv, isAdvOpen } = useMusicPlayer();
+  const { currentTrack, isTrackLoading, isTransitioning, openAdv, isAdvOpen, currentScreen } = useMusicPlayer();
   const playbackState = usePlaybackState();
   const { position, duration } = useProgress();
   const [isToggling, setIsToggling] = useState(false);
@@ -53,6 +54,9 @@ export const GlobalMusicPlayer = ({ drawerProgress }) => {
   // Check if drawerProgress exists and has interpolate method
   const hasDrawerProgress = drawerProgress && typeof drawerProgress.interpolate === 'function';
 
+  // Check if we're on SearchScreenAdv
+  const isSearchAdvScreen = currentScreen === 'SearchAdv';
+
   // Animate opacity based on drawer progress
   const opacity = hasDrawerProgress ? drawerProgress.interpolate({
     inputRange: [0, 1],
@@ -79,7 +83,7 @@ export const GlobalMusicPlayer = ({ drawerProgress }) => {
   return (
     <Animated.View 
       style={[
-        styles.globalPlayerWrapper,
+        isSearchAdvScreen ? styles.globalPlayerWrapperBottom : styles.globalPlayerWrapper,
         hasDrawerProgress ? {
           opacity,
           transform: [{ scale }],
@@ -91,7 +95,7 @@ export const GlobalMusicPlayer = ({ drawerProgress }) => {
         <TouchableOpacity style={styles.tapZone} onPress={openAdv} activeOpacity={0.9}>
           <Image source={{ uri: currentTrack.thumbnail_url }} style={styles.playerThumbnail} />
           <View style={styles.playerInfo}>
-            <MarqueeTitle text={currentTrack.title} textStyle={styles.playerTitle} delay={2000} />
+            <MarqueeTitle text={currentTrack.title} textStyle={styles.playerTitle} />
             <Text style={styles.playerArtist} numberOfLines={1}>{currentTrack.uploader}</Text>
           </View>
         </TouchableOpacity>
@@ -123,6 +127,7 @@ export const MusicPlayerProvider = ({ children }) => {
   const [isTrackLoading, setIsTrackLoading] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isAdvOpen, setIsAdvOpen] = useState(false);
+  const [currentScreen, setCurrentScreen] = useState(null);
 
   const setupPlayer = async () => {
     try {
@@ -256,6 +261,8 @@ export const MusicPlayerProvider = ({ children }) => {
       isAdvOpen,
       openAdv: () => setIsAdvOpen(true),
       closeAdv: () => setIsAdvOpen(false),
+      currentScreen,
+      setCurrentScreen, 
     }}>
       {children}
     </MusicPlayerContext.Provider>
@@ -375,5 +382,14 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
+  },
+  globalPlayerWrapperBottom: {  // Add this new style
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(32, 32, 32, 0.98)",
+    borderTopWidth: 1,
+    borderTopColor: "#333",
   },
 });
