@@ -270,57 +270,20 @@ export const MusicPlayerProvider = ({ children }) => {
 };
 
 // Title Marquee Component
-const MarqueeTitle = ({ text, textStyle, delay = 2000 }) => {
-  const [containerWidth, setContainerWidth] = useState(0);
-  const [contentWidth, setContentWidth] = useState(0);
-  const translateX = React.useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (containerWidth > 0 && contentWidth > containerWidth) {
-      const distance = contentWidth - containerWidth;
-      const duration = Math.max(1500, distance * 15);
-
-      const animation = Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(translateX, {
-            toValue: -distance,
-            duration,
-            easing: Easing.linear,
-            useNativeDriver: true,
-          }),
-          Animated.delay(1000),
-          Animated.timing(translateX, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-
-      animation.start();
-      return () => {
-        animation.stop();
-        translateX.setValue(0);
-      };
-    } else {
-      translateX.stopAnimation();
-      translateX.setValue(0);
-    }
-  }, [containerWidth, contentWidth, text, delay]);
-
+const MarqueeTitle = ({ text, textStyle }) => {
   return (
-    <View
-      style={{ overflow: "hidden" }}
-      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+    <TextTicker
+      style={textStyle}
+      duration={8000}
+      loop
+      bounce={false}
+      repeatSpacer={90}
+      marqueeDelay={3000}
+      shouldAnimateTreshold={10}
+      useNativeDriver
     >
-      <Animated.View
-        style={{ transform: [{ translateX }] }}
-        onLayout={(e) => setContentWidth(e.nativeEvent.layout.width)}
-      >
-        <Text style={textStyle}>{text}</Text>
-      </Animated.View>
-    </View>
+      {text}
+    </TextTicker>
   );
 };
 
