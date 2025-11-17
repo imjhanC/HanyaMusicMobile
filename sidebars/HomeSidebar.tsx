@@ -13,6 +13,7 @@ import {
   DrawerItem,
   useDrawerProgress,
 } from "@react-navigation/drawer";
+import { useNavigation } from "@react-navigation/native"; // Import useNavigation
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { BottomTabs } from "../App";
 import { GlobalMusicPlayer } from "../services/MusicPlayer";
@@ -32,6 +33,8 @@ function BottomTabsWithPlayer() {
 }
 
 function CustomDrawerContent(props: any) {
+  const navigation = useNavigation(); // Move useNavigation inside the component
+
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
       {/* Profile Section */}
@@ -66,14 +69,16 @@ function CustomDrawerContent(props: any) {
         />
       </View>
 
-      {/* Logout Section */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={() => console.log("Logout pressed")}
-        >
-          <Ionicons name="log-out-outline" size={22} color="#fff" />
-          <Text style={styles.logoutText}>Logout</Text>
+        <TouchableOpacity 
+          style={styles.logoutButton} 
+          onPress={() => {
+              props.navigation.closeDrawer();
+              navigation.navigate("Login");
+            }} // Use the navigation from useNavigation hook
+          >
+          <Ionicons name="log-in-outline" size={22} color="#fff" />
+          <Text style={styles.logoutText}>Login</Text>
         </TouchableOpacity>
       </View>
     </DrawerContentScrollView>

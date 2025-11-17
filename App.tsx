@@ -14,6 +14,7 @@ import SearchScreen from "./screens/SearchScreen/SearchScreen";
 import NoInternetScreen from "./screens/NoInternetScreen";
 import SearchScreenAdv from "./screens/SearchScreen/SearchScreenAdv";
 import SplashScreen from './screens/SplashScreen';
+import LoginScreen from './screens/LoginScreen/LoginScreen';
 
 // Music Player
 import { GlobalMusicPlayer, MusicPlayerProvider } from "./services/MusicPlayer";
@@ -82,9 +83,13 @@ function MainStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeDrawer" component={HomeSidebar} />
+      <Stack.Screen name="SearchAdv" component={SearchScreenAdv} />
+
+      {/* FULL SCREEN LOGIN SCREEN */}
       <Stack.Screen 
-        name="SearchAdv" 
-        component={SearchScreenAdv}
+        name="Login" 
+        component={LoginScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
@@ -170,9 +175,7 @@ export default function App() {
       <NavigationContainer>
         <View style={{ flex: 1 }}>
           <MainStack />
-          {/* Global Music Player - appears on all screens */}
           <GlobalMusicPlayer />
-          {/* Advanced Music Player - overlay modal */}
           <MusicPlayerAdv />
         </View>
       </NavigationContainer>
