@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, TouchableOpacity } from "react-native";
+import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -15,6 +15,11 @@ import NoInternetScreen from "./screens/NoInternetScreen";
 import SearchScreenAdv from "./screens/SearchScreen/SearchScreenAdv";
 import SplashScreen from './screens/SplashScreen';
 import LoginScreen from './screens/LoginScreen/LoginScreen';
+import TopGlobalArtists from './screens/HomeScreen/TopGlobalArtists';
+import TopGlobalSongs from './screens/HomeScreen/TopGlobalSongs';
+import TopCountrySongs from './screens/HomeScreen/TopCountrySongs';
+
+//import CreateAccScreen from './screens/LoginScreen/CreateAccScreen';
 
 // Music Player
 import { GlobalMusicPlayer, MusicPlayerProvider } from "./services/MusicPlayer";
@@ -31,8 +36,8 @@ const SPLASH_SHOWN_KEY = '@splash_shown';
 // Custom header with user icon
 function CustomHeader({ navigation }: any) {
   return (
-    <TouchableOpacity style={{ marginLeft: 16 }} onPress={() => navigation.openDrawer()}>
-      <Ionicons name="person-circle-outline" size={40} color="#fff" />
+    <TouchableOpacity style={styles.headerButton} onPress={() => navigation.openDrawer()}>
+      <Ionicons name="person-circle-outline" size={styles.headerIconSize.size} color="#fff" />
     </TouchableOpacity>
   );
 }
@@ -46,32 +51,36 @@ export function BottomTabs() {
         headerTintColor: "#fff",
         headerTitleAlign: "center",
         headerLeft: () => <CustomHeader navigation={navigation} />,
-        headerLeftContainerStyle: { paddingLeft: 16 }, 
+        headerLeftContainerStyle: styles.headerLeftContainer,
         tabBarStyle: {
           position: "absolute",
-          height: 90,
-          backgroundColor: "rgba(0, 0, 0, 0.95)",
+          height: styles.tabBarHeight.height,
+          backgroundColor: "rgba(0, 0, 0, 0.82)",
           borderTopWidth: 0,
           elevation: 0,
-          paddingTop: 13,
+          paddingTop: styles.tabBarPaddingTop.paddingTop,
         },
         tabBarIcon: ({ color, focused }) => {
           let iconName;
           if (route.name === "Home") iconName = focused ? "home" : "home-outline";
           else if (route.name === "Playlist") iconName = focused ? "list" : "list-outline";
           else if (route.name === "Search") iconName = focused ? "search" : "search-outline";
-          return <Ionicons name={iconName} size={28} color={color} />;
+          return <Ionicons name={iconName} size={styles.tabBarIconSize.size} color={color} />;
         },
-        tabBarLabelStyle: {
-          marginTop: 4,
-          fontSize: 12,
-        },
+        tabBarLabelStyle: styles.tabBarLabel,
         tabBarActiveTintColor: "#ffffff",
         tabBarInactiveTintColor: "gray",
-        tabBarButton: (props) => <TouchableOpacity {...props} activeOpacity={1} />,
+        tabBarButton: (props: any) => {
+          const { onPress, onLongPress, children, style } = props;
+          return (
+            <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={1} style={style}>
+              {children}
+            </TouchableOpacity>
+          );
+        },
       })}
     >
-      <Tab.Screen name="Home" component={Home} />
+      <Tab.Screen name="Home" component={Home} options={{ headerTitle: "" }} />
       <Tab.Screen name="Playlist" component={Playlist} />
       <Tab.Screen name="Search" component={SearchScreen} />
     </Tab.Navigator>
@@ -84,10 +93,12 @@ function MainStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeDrawer" component={HomeSidebar} />
       <Stack.Screen name="SearchAdv" component={SearchScreenAdv} />
-
+      <Stack.Screen name="TopGlobalArtists" component={TopGlobalArtists} />
+      <Stack.Screen name="TopGlobalSongs" component={TopGlobalSongs} />
+      <Stack.Screen name="TopCountrySongs" component={TopCountrySongs} />
       {/* FULL SCREEN LOGIN SCREEN */}
-      <Stack.Screen 
-        name="Login" 
+      <Stack.Screen
+        name="Login"
         component={LoginScreen}
         options={{ headerShown: false }}
       />
@@ -143,7 +154,7 @@ export default function App() {
       console.log("Network check failed:", error);
       setIsConnected(false);
     } finally {
-      setTimeout(() => setIsCheckingConnection(false), 1000);
+      setTimeout(() => setIsCheckingConnection(false), styles.retryTimeout.timeout);
     }
   };
 
@@ -182,3 +193,32 @@ export default function App() {
     </MusicPlayerProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  headerButton: {
+    marginLeft: 8,  // default : 16
+    marginTop: 8
+  },
+  headerIconSize: {
+    size: 45
+  },
+  headerLeftContainer: {
+    paddingLeft: 16
+  },
+  tabBarHeight: {
+    height: 90
+  },
+  tabBarPaddingTop: {
+    paddingTop: 13
+  },
+  tabBarIconSize: {
+    size: 28
+  },
+  tabBarLabel: {
+    marginTop: 4,
+    fontSize: 12
+  },
+  retryTimeout: {
+    timeout: 1000
+  }
+});

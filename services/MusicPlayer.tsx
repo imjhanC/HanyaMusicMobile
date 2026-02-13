@@ -9,6 +9,9 @@ import TrackPlayer, {
   useProgress,
 } from "react-native-track-player";
 
+// ENV import 
+import { HANYAMUSIC_URL } from "@env";
+
 // Context
 const MusicPlayerContext = createContext();
 
@@ -197,7 +200,7 @@ export const MusicPlayerProvider = ({ children }) => {
 
   const playTrack = async (track) => {
     try {
-      const API_BASE_URL = "https://instinctually-monosodium-shawnda.ngrok-free.app";
+      const API_BASE_URL = HANYAMUSIC_URL;
       
       const currentState = await TrackPlayer.getState();
       const hasCurrentTrack = currentTrack && currentState === State.Playing;

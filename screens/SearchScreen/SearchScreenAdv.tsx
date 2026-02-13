@@ -17,7 +17,10 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useMusicPlayer } from "../../services/MusicPlayer";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = "https://instinctually-monosodium-shawnda.ngrok-free.app";
+// ENV import 
+import { HANYAMUSIC_URL } from "@env";
+
+const API_BASE_URL = HANYAMUSIC_URL;
 const SEARCH_HISTORY_KEY = '@search_history';
 const MAX_HISTORY_ITEMS = 10;
 
