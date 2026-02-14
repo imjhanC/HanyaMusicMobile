@@ -39,7 +39,7 @@ export default function SearchScreenAdv() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const navigation = useNavigation();
-  const { playTrack, setCurrentScreen } = useMusicPlayer();
+  const { playTrack } = useMusicPlayer() as { playTrack: (track: SearchResult) => void };
 
   // Load search history on mount
   useEffect(() => {
@@ -188,11 +188,8 @@ export default function SearchScreenAdv() {
 
   useFocusEffect(
     React.useCallback(() => {
-      setCurrentScreen('SearchAdv');
-      return () => {
-        setCurrentScreen(null);
-      };
-    }, [setCurrentScreen])
+      return () => {};
+    }, [])
   );
 
   // Show search history when no query

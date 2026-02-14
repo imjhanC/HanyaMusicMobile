@@ -6,6 +6,7 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import NetInfo from "@react-native-community/netinfo";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSharedValue } from 'react-native-reanimated';
 
 // Screens
 import Home from "./screens/Home";
@@ -32,12 +33,13 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 const SPLASH_SHOWN_KEY = '@splash_shown';
+const RETRY_TIMEOUT = 1000;
 
 // Custom header with user icon
 function CustomHeader({ navigation }: any) {
   return (
     <TouchableOpacity style={styles.headerButton} onPress={() => navigation.openDrawer()}>
-      <Ionicons name="person-circle-outline" size={styles.headerIconSize.size} color="#fff" />
+      <Ionicons name="person-circle-outline" size={45} color="#fff" />
     </TouchableOpacity>
   );
 }
@@ -61,11 +63,11 @@ export function BottomTabs() {
           paddingTop: styles.tabBarPaddingTop.paddingTop,
         },
         tabBarIcon: ({ color, focused }) => {
-          let iconName;
+          let iconName = "home-outline";
           if (route.name === "Home") iconName = focused ? "home" : "home-outline";
           else if (route.name === "Playlist") iconName = focused ? "list" : "list-outline";
           else if (route.name === "Search") iconName = focused ? "search" : "search-outline";
-          return <Ionicons name={iconName} size={styles.tabBarIconSize.size} color={color} />;
+          return <Ionicons name={iconName} size={28} color={color} />;
         },
         tabBarLabelStyle: styles.tabBarLabel,
         tabBarActiveTintColor: "#ffffff",
@@ -82,7 +84,7 @@ export function BottomTabs() {
     >
       <Tab.Screen name="Home" component={Home} options={{ headerTitle: "" }} />
       <Tab.Screen name="Playlist" component={Playlist} />
-      <Tab.Screen name="Search" component={SearchScreen} />
+      <Tab.Screen name="Search" component={SearchScreen} options={{ headerTitleAlign: "left", headerTitleStyle: { fontSize: 35, fontWeight: "bold", marginLeft: 30, marginTop: 7 } }} />
     </Tab.Navigator>
   );
 }
@@ -111,6 +113,7 @@ export default function App() {
   const [isCheckingConnection, setIsCheckingConnection] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const drawerProgress = useSharedValue(0);
 
   // Check if splash has been shown before
   useEffect(() => {
@@ -154,7 +157,7 @@ export default function App() {
       console.log("Network check failed:", error);
       setIsConnected(false);
     } finally {
-      setTimeout(() => setIsCheckingConnection(false), styles.retryTimeout.timeout);
+      setTimeout(() => setIsCheckingConnection(false), RETRY_TIMEOUT);
     }
   };
 
@@ -186,7 +189,7 @@ export default function App() {
       <NavigationContainer>
         <View style={{ flex: 1 }}>
           <MainStack />
-          <GlobalMusicPlayer />
+          <GlobalMusicPlayer drawerProgress={drawerProgress} />
           <MusicPlayerAdv />
         </View>
       </NavigationContainer>
@@ -199,9 +202,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,  // default : 16
     marginTop: 8
   },
-  headerIconSize: {
-    size: 45
-  },
   headerLeftContainer: {
     paddingLeft: 16
   },
@@ -212,13 +212,11 @@ const styles = StyleSheet.create({
     paddingTop: 13
   },
   tabBarIconSize: {
-    size: 28
+    width: 28,
+    height: 28
   },
   tabBarLabel: {
     marginTop: 4,
     fontSize: 12
-  },
-  retryTimeout: {
-    timeout: 1000
   }
 });

@@ -74,8 +74,8 @@ function CustomDrawerContent(props: any) {
           style={styles.logoutButton} 
           onPress={() => {
               props.navigation.closeDrawer();
-              navigation.navigate("Login");
-            }} // Use the navigation from useNavigation hook
+              props.navigation.navigate("Login");
+            }}
           >
           <Ionicons name="log-in-outline" size={22} color="#fff" />
           <Text style={styles.logoutText}>Login</Text>

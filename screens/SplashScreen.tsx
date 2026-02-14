@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 
-const SplashScreen = ({ onFinish }) => {
+const SplashScreen = ({ onFinish } : { onFinish: any} ) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.3)).current;
   const letterSpacing = useRef(new Animated.Value(20)).current;

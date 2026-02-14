@@ -13,7 +13,20 @@ import TrackPlayer, {
 import { HANYAMUSIC_URL } from "@env";
 
 // Context
-const MusicPlayerContext = createContext();
+interface MusicPlayerContextType {
+  currentTrack: any;
+  setCurrentTrack: (track: any) => void;
+  playTrack: (track: any) => Promise<void>;
+  isTrackLoading: boolean;
+  isTransitioning: boolean;
+  isAdvOpen: boolean;
+  openAdv: () => void;
+  closeAdv: () => void;
+  currentScreen: string | null;
+  setCurrentScreen: (screen: string | null) => void;
+}
+
+const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
 export const useMusicPlayer = () => {
   const context = useContext(MusicPlayerContext);
@@ -24,7 +37,7 @@ export const useMusicPlayer = () => {
 };
 
 // Global Player Component
-export const GlobalMusicPlayer = ({ drawerProgress }) => {
+export const GlobalMusicPlayer = ({ drawerProgress } : { drawerProgress: any }) => {
   const { currentTrack, isTrackLoading, isTransitioning, openAdv, isAdvOpen, currentScreen } = useMusicPlayer();
   const playbackState = usePlaybackState();
   const { position, duration } = useProgress();
@@ -125,12 +138,12 @@ export const GlobalMusicPlayer = ({ drawerProgress }) => {
 };
 
 // Provider
-export const MusicPlayerProvider = ({ children }) => {
+export const MusicPlayerProvider = ({ children } : { children: React.ReactNode }) => {
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isAdvOpen, setIsAdvOpen] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState(null);
+  const [currentScreen, setCurrentScreen] = useState<string | null>(null);
 
   const setupPlayer = async () => {
     try {
@@ -198,7 +211,7 @@ export const MusicPlayerProvider = ({ children }) => {
     }
   };
 
-  const playTrack = async (track) => {
+  const playTrack = async (track: any) => {
     try {
       const API_BASE_URL = HANYAMUSIC_URL;
       
@@ -273,7 +286,7 @@ export const MusicPlayerProvider = ({ children }) => {
 };
 
 // Title Marquee Component
-const MarqueeTitle = ({ text, textStyle }) => {
+const MarqueeTitle = ({ text, textStyle }: { text: string; textStyle: any }) => {
   return (
     <TextTicker
       style={textStyle}

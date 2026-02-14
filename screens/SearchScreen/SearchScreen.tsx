@@ -1,10 +1,14 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity, TextInput } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, NavigationProp } from "@react-navigation/native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
+type RootStackParamList = {
+  SearchAdv: undefined;
+};
+
 const SearchScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   const handleSearchPress = () => {
     // Navigate directly to SearchAdv
