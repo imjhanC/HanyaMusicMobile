@@ -116,11 +116,7 @@ const styles = StyleSheet.create({
         width: CARD_WIDTH,
         margin: CARD_MARGIN,
         marginBottom: 16,
-        backgroundColor: '#1A1A1A', // Optional: Keep background or transparent
-        borderRadius: 8,
-        // If we want it to look exactly like Home card (no background color usually? Home has separate styles)
-        // Home styles: card width 140, no bg on container, Image has bg.
-        // Let's keep it clean
+        backgroundColor: '#1A1A1A',
         alignItems: 'flex-start',
     },
 

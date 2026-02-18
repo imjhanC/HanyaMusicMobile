@@ -12,8 +12,13 @@ import TrackPlayer, {
 // ENV import 
 import { HANYAMUSIC_URL } from "@env";
 
+
+// Service Manager
+import { ServiceManager } from "./ServiceManager";
+
 // Context
 interface MusicPlayerContextType {
+
   currentTrack: any;
   setCurrentTrack: (track: any) => void;
   playTrack: (track: any) => Promise<void>;
@@ -37,7 +42,7 @@ export const useMusicPlayer = () => {
 };
 
 // Global Player Component
-export const GlobalMusicPlayer = ({ drawerProgress } : { drawerProgress: any }) => {
+export const GlobalMusicPlayer = ({ drawerProgress }: { drawerProgress: any }) => {
   const { currentTrack, isTrackLoading, isTransitioning, openAdv, isAdvOpen, currentScreen } = useMusicPlayer();
   const playbackState = usePlaybackState();
   const { position, duration } = useProgress();
@@ -70,7 +75,6 @@ export const GlobalMusicPlayer = ({ drawerProgress } : { drawerProgress: any }) 
   // Check if drawerProgress exists and has interpolate method
   const hasDrawerProgress = drawerProgress && typeof drawerProgress.interpolate === 'function';
 
-  // Check if we're on SearchScreenAdv
   const isSearchAdvScreen = currentScreen === 'SearchAdv';
 
   // Animate opacity based on drawer progress
@@ -97,7 +101,7 @@ export const GlobalMusicPlayer = ({ drawerProgress } : { drawerProgress: any }) 
   };
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
         isSearchAdvScreen ? styles.globalPlayerWrapperBottom : styles.globalPlayerWrapper,
         hasDrawerProgress ? {
@@ -126,7 +130,7 @@ export const GlobalMusicPlayer = ({ drawerProgress } : { drawerProgress: any }) 
           ) : isToggling ? (
             <Ionicons name="hourglass" size={28} color="#999" />
           ) : (
-            <Ionicons name={isPlaying ? "pause" : "play"} size={32} color="#fff" />
+            <Ionicons name={isPlaying ? "pause" : "play"} size={32} color="#fff" style={styles.playButton} />
           )}
         </TouchableOpacity>
       </View>
@@ -138,7 +142,7 @@ export const GlobalMusicPlayer = ({ drawerProgress } : { drawerProgress: any }) 
 };
 
 // Provider
-export const MusicPlayerProvider = ({ children } : { children: React.ReactNode }) => {
+export const MusicPlayerProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -148,8 +152,8 @@ export const MusicPlayerProvider = ({ children } : { children: React.ReactNode }
   const setupPlayer = async () => {
     try {
       await TrackPlayer.setupPlayer({
-        waitForBuffer: true, // remove this if got any problems
-        autoHandleInterruptions: true, // <-- This keeps playback running when the app is minimized
+        waitForBuffer: true,
+        autoHandleInterruptions: true,
       });
       await TrackPlayer.updateOptions({
         capabilities: [
@@ -161,6 +165,12 @@ export const MusicPlayerProvider = ({ children } : { children: React.ReactNode }
         ],
         compactCapabilities: [Capability.Play, Capability.Pause],
       });
+
+      // RESTORE SESSION OR CLEAN UP
+      const sessionTrack = await ServiceManager.enforceAppLifecycle();
+      if (sessionTrack) {
+        setCurrentTrack(sessionTrack);
+      }
     } catch (e) {
       console.error("Error setting up player:", e);
     }
@@ -214,7 +224,7 @@ export const MusicPlayerProvider = ({ children } : { children: React.ReactNode }
   const playTrack = async (track: any) => {
     try {
       const API_BASE_URL = HANYAMUSIC_URL;
-      
+
       const currentState = await TrackPlayer.getState();
       const hasCurrentTrack = currentTrack && currentState === State.Playing;
 
@@ -223,27 +233,48 @@ export const MusicPlayerProvider = ({ children } : { children: React.ReactNode }
         await fadeOutCurrentTrack(800);
       }
 
-      setCurrentTrack(track);
+      // 1. Normalize the track data if it comes from Home screens
+      let trackToPlay = track;
+      if (track.song_name && track.artist_name && !track.videoId) {
+        trackToPlay = {
+          ...track,
+          title: track.song_name,
+          uploader: track.artist_name,
+          thumbnail_url: track.thumbnail,
+          isSearchBased: true,
+        };
+      }
+
+      setCurrentTrack(trackToPlay);
       setIsTrackLoading(true);
 
-      const response = await fetch(`${API_BASE_URL}/stream/${track.videoId}`);
-      const streamData = await response.json();
+      let streamData = null;
 
-      if (streamData.stream_url) {
+      // 2. Fetch specific endpoint based on track type
+      if (trackToPlay.isSearchBased) {
+        const query = `song_title=${encodeURIComponent(trackToPlay.song_name)}&artist=${encodeURIComponent(trackToPlay.artist_name)}`;
+        const response = await fetch(`${API_BASE_URL}/search/exact?${query}`);
+        streamData = await response.json();
+      } else {
+        const response = await fetch(`${API_BASE_URL}/stream/${track.videoId}`);
+        streamData = await response.json();
+      }
+
+      if (streamData && streamData.stream_url) {
         await TrackPlayer.reset();
 
         const trackConfig = {
-          id: track.videoId,
+          id: trackToPlay.videoId || streamData.id || String(Date.now()), // Fallback ID
           url: streamData.stream_url,
-          title: track.title,
-          artist: track.uploader,
-          artwork: track.thumbnail_url,
+          title: trackToPlay.title,
+          artist: trackToPlay.uploader,
+          artwork: trackToPlay.thumbnail_url,
           duration: streamData.duration,
           ...(streamData.headers ? { headers: streamData.headers } : {}),
         };
 
         await TrackPlayer.add(trackConfig);
-        
+
         if (hasCurrentTrack) {
           await fadeInNewTrack(800);
         } else {
@@ -262,23 +293,23 @@ export const MusicPlayerProvider = ({ children } : { children: React.ReactNode }
 
   useEffect(() => {
     setupPlayer();
-    return () => {
-      TrackPlayer.reset();
-    };
+    // Intentionally removed TrackPlayer.reset() from cleanup 
+    // to allow background playback to persist when app is minimized/closed
+    return () => { };
   }, []);
 
   return (
-    <MusicPlayerContext.Provider value={{ 
-      currentTrack, 
-      setCurrentTrack, 
-      playTrack, 
-      isTrackLoading, 
+    <MusicPlayerContext.Provider value={{
+      currentTrack,
+      setCurrentTrack,
+      playTrack,
+      isTrackLoading,
       isTransitioning,
       isAdvOpen,
       openAdv: () => setIsAdvOpen(true),
       closeAdv: () => setIsAdvOpen(false),
       currentScreen,
-      setCurrentScreen, 
+      setCurrentScreen,
     }}>
       {children}
     </MusicPlayerContext.Provider>
@@ -331,12 +362,14 @@ const styles = StyleSheet.create({
   },
   playerTitle: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
+    marginTop: 4,
   },
   playerArtist: {
     color: "#aaa",
     fontSize: 14,
+    marginBottom: 6,
   },
   controlButton: {
     width: 48,
@@ -356,6 +389,9 @@ const styles = StyleSheet.create({
   progressBar: {
     height: "100%",
     backgroundColor: "#1DB954",
+  },
+  playButton: {
+    marginRight: 12,
   },
   tapZone: {
     flex: 1,

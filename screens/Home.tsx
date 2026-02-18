@@ -4,6 +4,7 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 // Env 
 import { HANYAMUSIC_URL } from "@env";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
+import { useMusicPlayer } from "../services/MusicPlayer";
 
 const API_BASE_URL = HANYAMUSIC_URL;
 
@@ -90,6 +91,7 @@ const Home = () => {
   const [countryCode, setCountryCode] = useState("US"); // default
 
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { playTrack } = useMusicPlayer();
 
   useEffect(() => {
     fetchHomeData();
@@ -194,7 +196,7 @@ const Home = () => {
             <Text style={styles.sectionTitle}>Top Global Songs</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={true}>
               {data.topGlobalSongs.slice(0, 10).map((song) => (
-                <TouchableOpacity key={song.rank} activeOpacity={0.7}>
+                <TouchableOpacity key={song.rank} activeOpacity={0.7} onPress={() => playTrack(song)}>
                   <SongCard song={song} />
                 </TouchableOpacity>
               ))}
@@ -213,7 +215,7 @@ const Home = () => {
             <Text style={styles.sectionTitle}>Top Songs in {countryName}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={true}>
               {data.topCountrySongs.slice(0, 10).map((song) => (
-                <TouchableOpacity key={song.rank} activeOpacity={0.7}>
+                <TouchableOpacity key={song.rank} activeOpacity={0.7} onPress={() => playTrack(song)}>
                   <SongCard song={song} />
                 </TouchableOpacity>
               ))}
