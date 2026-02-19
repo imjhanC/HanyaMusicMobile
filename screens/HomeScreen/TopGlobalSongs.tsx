@@ -1,6 +1,9 @@
-import React from 'react';
-import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import TextTicker from 'react-native-text-ticker';
+import { useMusicPlayer } from '../../services/MusicPlayer';
 
 interface GlobalSong {
     rank: number;
@@ -15,46 +18,111 @@ interface Props {
     navigation: any;
 }
 
-const SongCard = React.memo(({ item }: { item: GlobalSong }) => (
-    <View style={styles.card}>
-        {/* Rank */}
-        <Text style={styles.rankText}>{item.rank}</Text>
+interface SongCardProps {
+    item: GlobalSong;
+    onPress: (item: GlobalSong) => void;
+    isCurrentlyPlaying: boolean;
+    isLoading: boolean;
+}
 
+const SongCard = React.memo(({ item, onPress, isCurrentlyPlaying, isLoading }: SongCardProps) => (
+    <TouchableOpacity
+        style={styles.card}
+        onPress={() => onPress(item)}
+        activeOpacity={0.75}
+    >
         {/* Song Thumbnail */}
-        <Image
-            source={{ uri: item.thumbnail }}
-            style={styles.image}
-        />
+        <View style={styles.imageContainer}>
+            <Image
+                source={{ uri: item.thumbnail }}
+                style={styles.image}
+            />
+            {isLoading && (
+                <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="small" color="#1DB954" />
+                </View>
+            )}
+        </View>
 
         {/* Song Info */}
         <View style={styles.songInfo}>
-            <Text style={styles.songName} numberOfLines={1}>
-                {item.song_name}
-            </Text>
+            {isCurrentlyPlaying ? (
+                <TextTicker
+                    style={[styles.songName, styles.songNameActive]}
+                    duration={15000}
+                    loop
+                    bounce={false}
+                    repeatSpacer={150}
+                    marqueeDelay={3000}
+                    shouldAnimateTreshold={10}
+                    useNativeDriver
+                >
+                    {item.song_name}
+                </TextTicker>
+            ) : (
+                <Text style={styles.songName} numberOfLines={1}>
+                    {item.song_name}
+                </Text>
+            )}
             <Text style={styles.artistName} numberOfLines={1}>
                 {item.artist_name}
             </Text>
         </View>
-    </View>
+    </TouchableOpacity>
 ));
 
 const TopGlobalSongs = ({ route, navigation }: Props) => {
     const { GlobalSongs } = route.params;
+    const { playTrack, currentTrack, isTrackLoading, setCurrentScreen, setQueue } = useMusicPlayer();
 
-    const renderItem = React.useCallback(({ item }: { item: GlobalSong }) => (
-        <SongCard item={item} />
-    ), []);
+    useEffect(() => {
+        setCurrentScreen('TopGlobalSongs');
+        setQueue(GlobalSongs || []);
+        return () => {
+            setCurrentScreen(null);
+        };
+    }, [GlobalSongs]);
+
+    const handleSongPress = React.useCallback((item: GlobalSong) => {
+        playTrack({
+            song_name: item.song_name,
+            artist_name: item.artist_name,
+            thumbnail: item.thumbnail,
+            title: item.song_name,
+            uploader: item.artist_name,
+            thumbnail_url: item.thumbnail,
+            isSearchBased: true,
+        });
+    }, [playTrack]);
+
+    const renderItem = React.useCallback(({ item }: { item: GlobalSong }) => {
+        const isCurrentlyPlaying =
+            currentTrack?.song_name === item.song_name &&
+            currentTrack?.artist_name === item.artist_name;
+
+        const isLoading =
+            isTrackLoading && isCurrentlyPlaying;
+
+        return (
+            <SongCard
+                item={item}
+                onPress={handleSongPress}
+                isCurrentlyPlaying={isCurrentlyPlaying}
+                isLoading={isLoading}
+            />
+        );
+    }, [handleSongPress, currentTrack, isTrackLoading]);
 
     const keyExtractor = React.useCallback((item: GlobalSong) => item.rank.toString(), []);
 
     const getItemLayout = React.useCallback((data: any, index: number) => ({
-        length: 72, // 52 (image) + 20 (padding)
-        offset: (72 + 8) * index, // (length + marginBottom) * index
+        length: 70,
+        offset: 70 * index,
         index,
     }), []);
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -77,7 +145,7 @@ const TopGlobalSongs = ({ route, navigation }: Props) => {
                 removeClippedSubviews={true}
                 updateCellsBatchingPeriod={50}
             />
-        </View>
+        </SafeAreaView>
     );
 };
 
@@ -88,7 +156,7 @@ const styles = StyleSheet.create({
     },
 
     header: {
-        paddingTop: 48,
+        paddingTop: 12,
         paddingBottom: 12,
         paddingHorizontal: 16,
         flexDirection: 'row',
@@ -108,36 +176,36 @@ const styles = StyleSheet.create({
 
     listContent: {
         paddingHorizontal: 16,
-        paddingBottom: 16,
+        paddingBottom: 100,
     },
 
     card: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1A1A1A',
-        paddingVertical: 10,
-        paddingHorizontal: 10,
-        borderRadius: 14,
-        marginBottom: 8,
-        borderWidth: 0.5,
-        borderColor: '#2A2A2A',
+        paddingVertical: 8,
+        marginBottom: 4,
     },
 
-    rankText: {
-        width: 28,
-        color: '#09ff00',
-        fontSize: 16,
-        fontWeight: '800',
-        textAlign: 'center',
-        marginRight: 12,
+    imageContainer: {
+        width: 52,
+        height: 52,
+        marginRight: 14,
+        borderRadius: 8,
+        overflow: 'hidden',
+        backgroundColor: '#2A2A2A',
     },
 
     image: {
         width: 52,
         height: 52,
         borderRadius: 8,
-        marginRight: 14,
-        backgroundColor: '#2A2A2A',
+    },
+
+    loadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 
     songInfo: {
@@ -152,12 +220,15 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
 
+    songNameActive: {
+        color: '#1DB954',
+    },
+
     artistName: {
         color: '#b3b3b3',
         fontSize: 14,
         fontWeight: '400',
     },
 });
-
 
 export default TopGlobalSongs;

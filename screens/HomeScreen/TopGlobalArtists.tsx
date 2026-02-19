@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 interface Artist {
@@ -47,7 +48,7 @@ const TopGlobalArtists = ({ route, navigation }: Props) => {
     }), []);
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -70,7 +71,7 @@ const TopGlobalArtists = ({ route, navigation }: Props) => {
                 removeClippedSubviews={true}
                 updateCellsBatchingPeriod={50}
             />
-        </View>
+        </SafeAreaView>
     );
 };
 
@@ -81,7 +82,7 @@ const styles = StyleSheet.create({
     },
 
     header: {
-        paddingTop: 48,
+        paddingTop: 12,
         paddingBottom: 12,
         paddingHorizontal: 16,
         flexDirection: 'row',

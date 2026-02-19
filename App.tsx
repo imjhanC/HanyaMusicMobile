@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import NetInfo from "@react-native-community/netinfo";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useSharedValue } from 'react-native-reanimated';
 
 // Screens
 import Home from "./screens/Home";
@@ -31,6 +30,7 @@ import HomeSidebar from "./sidebars/HomeSidebar";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+const HomeStack = createNativeStackNavigator();
 
 const SPLASH_SHOWN_KEY = '@splash_shown';
 const RETRY_TIMEOUT = 1000;
@@ -48,44 +48,62 @@ function CustomHeader({ navigation }: any) {
 export function BottomTabs() {
   return (
     <Tab.Navigator
-      screenOptions={({ route, navigation }) => ({
-        headerStyle: { backgroundColor: "#121212" },
-        headerTintColor: "#fff",
-        headerTitleAlign: "center",
-        headerLeft: () => <CustomHeader navigation={navigation} />,
-        headerLeftContainerStyle: styles.headerLeftContainer,
-        tabBarStyle: {
-          position: "absolute",
-          height: styles.tabBarHeight.height,
-          backgroundColor: "rgba(0, 0, 0, 0.82)",
-          borderTopWidth: 0,
-          elevation: 0,
-          paddingTop: styles.tabBarPaddingTop.paddingTop,
-        },
-        tabBarIcon: ({ color, focused }) => {
-          let iconName = "home-outline";
-          if (route.name === "Home") iconName = focused ? "home" : "home-outline";
-          else if (route.name === "Playlist") iconName = focused ? "list" : "list-outline";
-          else if (route.name === "Search") iconName = focused ? "search" : "search-outline";
-          return <Ionicons name={iconName} size={28} color={color} />;
-        },
-        tabBarLabelStyle: styles.tabBarLabel,
-        tabBarActiveTintColor: "#ffffff",
-        tabBarInactiveTintColor: "gray",
-        tabBarButton: (props: any) => {
-          const { onPress, onLongPress, children, style } = props;
-          return (
-            <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={1} style={style}>
-              {children}
-            </TouchableOpacity>
-          );
-        },
-      })}
+      screenOptions={({ route, navigation }) => {
+        const routeName = getFocusedRouteNameFromRoute(route) ?? "HomeMain";
+        const isHeaderHidden = ["TopGlobalArtists", "TopGlobalSongs", "TopCountrySongs"].includes(routeName);
+
+        return {
+          headerShown: !isHeaderHidden,
+          headerStyle: { backgroundColor: "#121212" },
+          headerTintColor: "#fff",
+          headerTitleAlign: "center",
+          headerLeft: () => <CustomHeader navigation={navigation} />,
+          headerLeftContainerStyle: styles.headerLeftContainer,
+          tabBarStyle: {
+            position: "absolute",
+            height: styles.tabBarHeight.height,
+            backgroundColor: "rgba(0, 0, 0, 0.82)",
+            borderTopWidth: 0,
+            elevation: 0,
+            paddingTop: styles.tabBarPaddingTop.paddingTop,
+          },
+          tabBarIcon: ({ color, focused }) => {
+            let iconName = "home-outline";
+            if (route.name === "Home") iconName = focused ? "home" : "home-outline";
+            else if (route.name === "Playlist") iconName = focused ? "list" : "list-outline";
+            else if (route.name === "Search") iconName = focused ? "search" : "search-outline";
+            return <Ionicons name={iconName} size={28} color={color} />;
+          },
+          tabBarLabelStyle: styles.tabBarLabel,
+          tabBarActiveTintColor: "#ffffff",
+          tabBarInactiveTintColor: "gray",
+          tabBarButton: (props: any) => {
+            const { onPress, onLongPress, children, style } = props;
+            return (
+              <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={1} style={style}>
+                {children}
+              </TouchableOpacity>
+            );
+          },
+        };
+      }}
     >
-      <Tab.Screen name="Home" component={Home} options={{ headerTitle: "" }} />
+      <Tab.Screen name="Home" component={HomeStackNavigator} options={{ headerTitle: "" }} />
       <Tab.Screen name="Playlist" component={Playlist} />
       <Tab.Screen name="Search" component={SearchScreen} options={{ headerTitleAlign: "left", headerTitleStyle: { fontSize: 35, fontWeight: "bold", marginLeft: 30, marginTop: 7 } }} />
     </Tab.Navigator>
+  );
+}
+
+// Home nested stack — gives Home sub-screens the bottom tab bar
+function HomeStackNavigator() {
+  return (
+    <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+      <HomeStack.Screen name="HomeMain" component={Home} />
+      <HomeStack.Screen name="TopGlobalArtists" component={TopGlobalArtists} />
+      <HomeStack.Screen name="TopGlobalSongs" component={TopGlobalSongs} />
+      <HomeStack.Screen name="TopCountrySongs" component={TopCountrySongs} />
+    </HomeStack.Navigator>
   );
 }
 
@@ -95,9 +113,6 @@ function MainStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeDrawer" component={HomeSidebar} />
       <Stack.Screen name="SearchAdv" component={SearchScreenAdv} />
-      <Stack.Screen name="TopGlobalArtists" component={TopGlobalArtists} />
-      <Stack.Screen name="TopGlobalSongs" component={TopGlobalSongs} />
-      <Stack.Screen name="TopCountrySongs" component={TopCountrySongs} />
       {/* FULL SCREEN LOGIN SCREEN */}
       <Stack.Screen
         name="Login"
@@ -113,7 +128,6 @@ export default function App() {
   const [isCheckingConnection, setIsCheckingConnection] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
-  const drawerProgress = useSharedValue(0);
 
   // Check if splash has been shown before
   useEffect(() => {
@@ -189,7 +203,6 @@ export default function App() {
       <NavigationContainer>
         <View style={{ flex: 1 }}>
           <MainStack />
-          <GlobalMusicPlayer drawerProgress={drawerProgress} />
           <MusicPlayerAdv />
         </View>
       </NavigationContainer>

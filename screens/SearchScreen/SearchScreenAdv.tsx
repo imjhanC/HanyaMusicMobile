@@ -14,8 +14,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { useMusicPlayer } from "../../services/MusicPlayer";
+import { useMusicPlayer, GlobalMusicPlayer } from "../../services/MusicPlayer";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSharedValue } from 'react-native-reanimated';
 
 // ENV import 
 import { HANYAMUSIC_URL } from "@env";
@@ -39,7 +40,16 @@ export default function SearchScreenAdv() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const navigation = useNavigation();
-  const { playTrack } = useMusicPlayer() as { playTrack: (track: SearchResult) => void };
+  const { playTrack, setCurrentScreen } = useMusicPlayer() as { playTrack: (track: SearchResult) => void; setCurrentScreen: (screen: string | null) => void };
+  const drawerProgress = useSharedValue(0);
+
+  // Track screen name for mini-player positioning
+  useFocusEffect(
+    React.useCallback(() => {
+      setCurrentScreen('SearchAdv');
+      return () => setCurrentScreen(null);
+    }, [setCurrentScreen])
+  );
 
   // Load search history on mount
   useEffect(() => {
@@ -118,7 +128,7 @@ export default function SearchScreenAdv() {
     setIsLoading(true);
     setSearchResults([]);
     setErrorMessage("");
-    
+
     // Add to search history when search is initiated
     addToSearchHistory(query);
 
@@ -188,7 +198,7 @@ export default function SearchScreenAdv() {
 
   useFocusEffect(
     React.useCallback(() => {
-      return () => {};
+      return () => { };
     }, [])
   );
 
@@ -260,8 +270,8 @@ export default function SearchScreenAdv() {
                     errorMessage === "server-error"
                       ? "cloud-offline-outline"
                       : query.trim()
-                      ? "musical-notes-outline"
-                      : "search-outline"
+                        ? "musical-notes-outline"
+                        : "search-outline"
                   }
                   size={64}
                   color="#555"
@@ -271,15 +281,15 @@ export default function SearchScreenAdv() {
                   {errorMessage === "server-error"
                     ? "No Response from Server"
                     : query.trim()
-                    ? "No Results Found"
-                    : "Start Typing to Search"}
+                      ? "No Results Found"
+                      : "Start Typing to Search"}
                 </Text>
                 <Text style={styles.emptySubtitle}>
                   {errorMessage === "server-error"
                     ? "Please contact the admin for help."
                     : query.trim()
-                    ? "Try a different keyword or check your spelling."
-                    : "Discover music by searching above."}
+                      ? "Try a different keyword or check your spelling."
+                      : "Discover music by searching above."}
                 </Text>
               </View>
             }
@@ -288,6 +298,7 @@ export default function SearchScreenAdv() {
           />
         )}
       </View>
+      <GlobalMusicPlayer drawerProgress={drawerProgress} />
     </SafeAreaView>
   );
 }

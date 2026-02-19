@@ -29,6 +29,8 @@ interface MusicPlayerContextType {
   closeAdv: () => void;
   currentScreen: string | null;
   setCurrentScreen: (screen: string | null) => void;
+  queue: any[];
+  setQueue: (tracks: any[]) => void;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -113,10 +115,15 @@ export const GlobalMusicPlayer = ({ drawerProgress }: { drawerProgress: any }) =
     >
       <View style={styles.globalPlayerContainer}>
         <TouchableOpacity style={styles.tapZone} onPress={openAdv} activeOpacity={0.9}>
-          <Image source={{ uri: currentTrack.thumbnail_url }} style={styles.playerThumbnail} />
+          <Image
+            source={{ uri: currentTrack.thumbnail_url || currentTrack.artwork || "" }}
+            style={styles.playerThumbnail}
+          />
           <View style={styles.playerInfo}>
-            <MarqueeTitle text={currentTrack.title} textStyle={styles.playerTitle} />
-            <Text style={styles.playerArtist} numberOfLines={1}>{currentTrack.uploader}</Text>
+            <MarqueeTitle text={currentTrack.title || "Unknown Title"} textStyle={styles.playerTitle} />
+            <Text style={styles.playerArtist} numberOfLines={1}>
+              {currentTrack.uploader || currentTrack.artist || "Unknown Artist"}
+            </Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity
@@ -141,6 +148,50 @@ export const GlobalMusicPlayer = ({ drawerProgress }: { drawerProgress: any }) =
   );
 };
 
+// Autoplay Manager
+const AutoplayManager = () => {
+  const { currentTrack, queue, playTrack, isTrackLoading, isTransitioning } = useMusicPlayer();
+  const { position, duration } = useProgress();
+  const [hasTriggered, setHasTriggered] = useState(false);
+
+  useEffect(() => {
+    // Reset trigger when current track changes
+    setHasTriggered(false);
+  }, [currentTrack?.title, currentTrack?.uploader]); // Use specific properties to avoid jitter
+
+  useEffect(() => {
+    // PROTECTIVE GUARDS
+    // 1. Don't trigger if we're already loading or transitioning
+    // 2. Don't trigger if we've already fired for this song
+    // 3. Don't trigger if duration is invalid or we're at the very start
+    if (isTrackLoading || isTransitioning || hasTriggered) return;
+    if (!currentTrack || !queue.length || duration <= 0 || position < 5) return;
+
+    const remaining = duration - position;
+
+    // Trigger when 1.5 seconds are left
+    if (remaining > 0 && remaining <= 1.5) {
+      const currentIndex = queue.findIndex(t =>
+      (t.song_name === (currentTrack.song_name || currentTrack.title) &&
+        t.artist_name === (currentTrack.artist_name || currentTrack.uploader))
+      );
+
+      if (currentIndex !== -1 && currentIndex < queue.length - 1) {
+        setHasTriggered(true); // LOCK
+        const nextTrack = queue[currentIndex + 1];
+        console.log("Autoplay: Transitioning to next song:", nextTrack.song_name || nextTrack.title);
+
+        playTrack({
+          ...nextTrack,
+          isSearchBased: true
+        });
+      }
+    }
+  }, [position, duration, currentTrack, queue, hasTriggered, isTrackLoading, isTransitioning]);
+
+  return null;
+};
+
 // Provider
 export const MusicPlayerProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentTrack, setCurrentTrack] = useState(null);
@@ -148,6 +199,7 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isAdvOpen, setIsAdvOpen] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<string | null>(null);
+  const [queue, setQueue] = useState<any[]>([]);
 
   const setupPlayer = async () => {
     try {
@@ -310,8 +362,11 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
       closeAdv: () => setIsAdvOpen(false),
       currentScreen,
       setCurrentScreen,
+      queue,
+      setQueue,
     }}>
       {children}
+      <AutoplayManager />
     </MusicPlayerContext.Provider>
   );
 };
@@ -321,10 +376,10 @@ const MarqueeTitle = ({ text, textStyle }: { text: string; textStyle: any }) => 
   return (
     <TextTicker
       style={textStyle}
-      duration={8000}
+      duration={15000}
       loop
       bounce={false}
-      repeatSpacer={90}
+      repeatSpacer={150}
       marqueeDelay={3000}
       shouldAnimateTreshold={10}
       useNativeDriver

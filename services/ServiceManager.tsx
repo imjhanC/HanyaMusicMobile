@@ -31,7 +31,12 @@ export class ServiceManager {
                     const trackData = await TrackPlayer.getTrack(trackIndex);
                     if (trackData) {
                         console.log("ServiceManager: Restoring active session for track:", trackData.title);
-                        return trackData;
+                        // Normalize data for UI (MusicPlayer.tsx expects thumbnail_url and uploader)
+                        return {
+                            ...trackData,
+                            thumbnail_url: trackData.artwork || trackData.thumbnail_url,
+                            uploader: trackData.artist || trackData.uploader,
+                        };
                     }
                 }
             }
