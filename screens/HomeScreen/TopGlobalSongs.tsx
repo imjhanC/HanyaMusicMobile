@@ -222,6 +222,7 @@ const styles = StyleSheet.create({
 
     songNameActive: {
         color: '#1DB954',
+        marginTop: 6,
     },
 
     artistName: {

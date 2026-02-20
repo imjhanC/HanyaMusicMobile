@@ -7,6 +7,7 @@ import TrackPlayer, {
   State,
   usePlaybackState,
   useProgress,
+  RepeatMode,
 } from "react-native-track-player";
 
 // ENV import 
@@ -31,6 +32,10 @@ interface MusicPlayerContextType {
   setCurrentScreen: (screen: string | null) => void;
   queue: any[];
   setQueue: (tracks: any[]) => void;
+  skipNext: () => Promise<void>;
+  skipPrevious: () => Promise<void>;
+  repeatMode: "off" | "once" | "track";
+  setRepeatMode: (mode: "off" | "once" | "track") => void;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -62,8 +67,8 @@ export const GlobalMusicPlayer = ({ drawerProgress }: { drawerProgress: any }) =
       } else {
         await TrackPlayer.play();
       }
-    } catch (error) {
-      console.error("Error toggling play/pause:", error);
+    } catch (err) {
+      console.error("Error toggling play/pause:", err);
     } finally {
       setTimeout(() => setIsToggling(false), 100);
     }
@@ -150,20 +155,19 @@ export const GlobalMusicPlayer = ({ drawerProgress }: { drawerProgress: any }) =
 
 // Autoplay Manager
 const AutoplayManager = () => {
-  const { currentTrack, queue, playTrack, isTrackLoading, isTransitioning } = useMusicPlayer();
+  const { currentTrack, queue, playTrack, isTrackLoading, isTransitioning, repeatMode, setRepeatMode, skipNext } = useMusicPlayer();
   const { position, duration } = useProgress();
   const [hasTriggered, setHasTriggered] = useState(false);
+  const [hasRepeatedOnce, setHasRepeatedOnce] = useState(false);
 
   useEffect(() => {
-    // Reset trigger when current track changes
+    // Reset both flags when a new track starts
     setHasTriggered(false);
-  }, [currentTrack?.title, currentTrack?.uploader]); // Use specific properties to avoid jitter
+    setHasRepeatedOnce(false);
+  }, [currentTrack?.title, currentTrack?.uploader]);
 
   useEffect(() => {
     // PROTECTIVE GUARDS
-    // 1. Don't trigger if we're already loading or transitioning
-    // 2. Don't trigger if we've already fired for this song
-    // 3. Don't trigger if duration is invalid or we're at the very start
     if (isTrackLoading || isTransitioning || hasTriggered) return;
     if (!currentTrack || !queue.length || duration <= 0 || position < 5) return;
 
@@ -171,35 +175,68 @@ const AutoplayManager = () => {
 
     // Trigger when 1.5 seconds are left
     if (remaining > 0 && remaining <= 1.5) {
+      if (repeatMode === "track") {
+        // TrackPlayer handles indefinite repeat natively
+        return;
+      }
+
+      if (repeatMode === "once") {
+        // Lock immediately to prevent double-firing
+        setHasTriggered(true);
+
+        if (!hasRepeatedOnce) {
+          // First play-through ended: seek back and play one more time
+          console.log("Autoplay: Repeat once - replaying song.");
+          setHasRepeatedOnce(true);
+          TrackPlayer.seekTo(0);
+          TrackPlayer.play();
+          // After seek settles, allow the trigger to fire again for the second end
+          setTimeout(() => setHasTriggered(false), 2000);
+        } else {
+          // Second play-through ended: turn off repeat and move to next
+          console.log("Autoplay: Repeat once finished - moving to next song.");
+          setRepeatMode("off");
+          skipNext();
+        }
+        return;
+      }
+
+      // Normal autoplay (repeatMode === "off")
       const currentIndex = queue.findIndex(t =>
       (t.song_name === (currentTrack.song_name || currentTrack.title) &&
         t.artist_name === (currentTrack.artist_name || currentTrack.uploader))
       );
 
       if (currentIndex !== -1 && currentIndex < queue.length - 1) {
-        setHasTriggered(true); // LOCK
+        setHasTriggered(true);
         const nextTrack = queue[currentIndex + 1];
         console.log("Autoplay: Transitioning to next song:", nextTrack.song_name || nextTrack.title);
-
-        playTrack({
-          ...nextTrack,
-          isSearchBased: true
-        });
+        playTrack({ ...nextTrack, isSearchBased: true });
       }
     }
-  }, [position, duration, currentTrack, queue, hasTriggered, isTrackLoading, isTransitioning]);
+  }, [position, duration, currentTrack, queue, hasTriggered, hasRepeatedOnce, isTrackLoading, isTransitioning, repeatMode]);
 
   return null;
 };
 
 // Provider
 export const MusicPlayerProvider = ({ children }: { children: React.ReactNode }) => {
-  const [currentTrack, setCurrentTrack] = useState(null);
+  const [currentTrack, setCurrentTrack] = useState<any>(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isAdvOpen, setIsAdvOpen] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<string | null>(null);
   const [queue, setQueue] = useState<any[]>([]);
+  const [repeatMode, _setRepeatMode] = useState<"off" | "once" | "track">("off");
+
+  const setRepeatMode = async (mode: "off" | "once" | "track") => {
+    _setRepeatMode(mode);
+    if (mode === "track") {
+      await TrackPlayer.setRepeatMode(RepeatMode.Track);
+    } else {
+      await TrackPlayer.setRepeatMode(RepeatMode.Off);
+    }
+  };
 
   const setupPlayer = async () => {
     try {
@@ -245,8 +282,8 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
 
       await TrackPlayer.pause();
       await TrackPlayer.setVolume(1);
-    } catch (error) {
-      console.error("Error fading out track:", error);
+    } catch (err) {
+      console.error("Error fading out track:", err);
       await TrackPlayer.setVolume(1);
     }
   };
@@ -267,8 +304,8 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
       }
 
       await TrackPlayer.setVolume(1);
-    } catch (error) {
-      console.error("Error fading in track:", error);
+    } catch (err) {
+      console.error("Error fading in track:", err);
       await TrackPlayer.setVolume(1);
     }
   };
@@ -333,8 +370,8 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
           await TrackPlayer.play();
         }
       }
-    } catch (error) {
-      console.error("Error playing track:", error);
+    } catch (err) {
+      console.error("Error playing track:", err);
       setCurrentTrack(null);
       await TrackPlayer.setVolume(1);
     } finally {
@@ -350,6 +387,32 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
     return () => { };
   }, []);
 
+  const skipNext = async () => {
+    if (!queue.length || !currentTrack) return;
+    const currentIndex = queue.findIndex((t: any) =>
+      (t.song_name || t.title) === (currentTrack.song_name || currentTrack.title)
+    );
+    if (currentIndex !== -1 && currentIndex < queue.length - 1) {
+      await playTrack({ ...queue[currentIndex + 1], isSearchBased: true });
+    }
+  };
+
+  const skipPrevious = async () => {
+    if (!queue.length || !currentTrack) return;
+    const { position } = await TrackPlayer.getProgress();
+    if (position > 5) {
+      await TrackPlayer.seekTo(0);
+      return;
+    }
+
+    const currentIndex = queue.findIndex((t: any) =>
+      (t.song_name || t.title) === (currentTrack.song_name || currentTrack.title)
+    );
+    if (currentIndex > 0) {
+      await playTrack({ ...queue[currentIndex - 1], isSearchBased: true });
+    }
+  };
+
   return (
     <MusicPlayerContext.Provider value={{
       currentTrack,
@@ -364,6 +427,10 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
       setCurrentScreen,
       queue,
       setQueue,
+      skipNext,
+      skipPrevious,
+      repeatMode,
+      setRepeatMode,
     }}>
       {children}
       <AutoplayManager />
@@ -372,10 +439,10 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
 };
 
 // Title Marquee Component
-const MarqueeTitle = ({ text, textStyle }: { text: string; textStyle: any }) => {
+export const MarqueeTitle = ({ text, textStyle, style }: { text: string; textStyle?: any; style?: any }) => {
   return (
     <TextTicker
-      style={textStyle}
+      style={[textStyle, style]}
       duration={15000}
       loop
       bounce={false}

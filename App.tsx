@@ -138,8 +138,8 @@ export default function App() {
           setShowSplash(false);
         }
         setIsLoading(false);
-      } catch (error) {
-        console.log('Error checking splash status:', error);
+      } catch (err) {
+        console.log('Error checking splash status:', err);
         setIsLoading(false);
       }
     };
@@ -167,8 +167,8 @@ export default function App() {
       const state = await NetInfo.refresh();
       const connected = state.isConnected && state.isInternetReachable !== false;
       setIsConnected(connected);
-    } catch (error) {
-      console.log("Network check failed:", error);
+    } catch (err) {
+      console.log("Network check failed:", err);
       setIsConnected(false);
     } finally {
       setTimeout(() => setIsCheckingConnection(false), RETRY_TIMEOUT);
@@ -179,8 +179,8 @@ export default function App() {
     try {
       await AsyncStorage.setItem(SPLASH_SHOWN_KEY, 'true');
       setShowSplash(false);
-    } catch (error) {
-      console.log('Error saving splash status:', error);
+    } catch (err) {
+      console.log('Error saving splash status:', err);
       setShowSplash(false);
     }
   };

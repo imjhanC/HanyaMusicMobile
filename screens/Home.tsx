@@ -43,7 +43,7 @@ interface HomeScreenResult {
   topGlobalSongs: Song[];
   topCountrySongs: Song[];
   isLoading: boolean;
-  error: string | null;
+  errorMessage: string | null;
 }
 
 const ArtistCard = React.memo(({ artist }: { artist: Artist }) => (
@@ -85,7 +85,7 @@ const Home = () => {
     topGlobalSongs: [],
     topCountrySongs: [],
     isLoading: true,
-    error: null,
+    errorMessage: null,
   });
   const [countryName, setCountryName] = useState("United States"); // default
   const [countryCode, setCountryCode] = useState("US"); // default
@@ -99,7 +99,7 @@ const Home = () => {
 
   const fetchHomeData = async () => {
     try {
-      setData(prev => ({ ...prev, isLoading: true, error: null }));
+      setData(prev => ({ ...prev, isLoading: true, errorMessage: null }));
 
       // Fetch country information from IP API
       const ipResponse = await fetch('http://ip-api.com/json');
@@ -135,13 +135,13 @@ const Home = () => {
         topGlobalSongs: globalSongsData.songs || [],
         topCountrySongs: countrySongsData.songs || [],
         isLoading: false,
-        error: null,
+        errorMessage: null,
       });
-    } catch (error) {
+    } catch (err) {
       setData(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : "An error occurred",
+        errorMessage: err instanceof Error ? err.message : "An error occurred",
       }));
     }
   };
@@ -154,10 +154,10 @@ const Home = () => {
     );
   }
 
-  if (data.error) {
+  if (data.errorMessage) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.errorText}>{data.error}</Text>
+        <Text style={styles.errorText}>{data.errorMessage}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchHomeData}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
