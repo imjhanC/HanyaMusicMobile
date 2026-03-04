@@ -2,11 +2,9 @@ import React, { useEffect, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, ScrollView, Text, Image, ActivityIndicator } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 // Env 
-import { HANYAMUSIC_URL } from "@env";
+// import { HANYAMUSIC_URL } from "@env";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
 import { useMusicPlayer } from "../services/MusicPlayer";
-
-const API_BASE_URL = HANYAMUSIC_URL;
 
 // For top Global Artists 
 interface Artist {
@@ -79,6 +77,8 @@ const SongCard = React.memo(({ song }: { song: Song }) => (
   </View>
 ));
 
+import { ServiceManager } from "../services/ServiceManager";
+
 const Home = () => {
   const [data, setData] = useState<HomeScreenResult>({
     topGlobalArtists: [],
@@ -100,6 +100,9 @@ const Home = () => {
   const fetchHomeData = async () => {
     try {
       setData(prev => ({ ...prev, isLoading: true, errorMessage: null }));
+
+      // Fetch dynamic API base URL
+      const API_BASE_URL = await ServiceManager.getHanyaMusicUrl();
 
       // Fetch country information from IP API
       const ipResponse = await fetch('http://ip-api.com/json');

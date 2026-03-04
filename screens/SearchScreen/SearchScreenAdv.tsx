@@ -17,11 +17,11 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useMusicPlayer, GlobalMusicPlayer } from "../../services/MusicPlayer";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSharedValue } from 'react-native-reanimated';
+import { ServiceManager } from "../../services/ServiceManager";
 
 // ENV import 
-import { HANYAMUSIC_URL } from "@env";
+// import { HANYAMUSIC_URL } from "@env";
 
-const API_BASE_URL = HANYAMUSIC_URL;
 const SEARCH_HISTORY_KEY = '@search_history';
 const MAX_HISTORY_ITEMS = 10;
 
@@ -133,6 +133,7 @@ export default function SearchScreenAdv() {
     addToSearchHistory(query);
 
     try {
+      const API_BASE_URL = await ServiceManager.getHanyaMusicUrl();
       const response = await fetch(
         `${API_BASE_URL}/search?q=${encodeURIComponent(query)}`
       );

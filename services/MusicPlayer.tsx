@@ -11,7 +11,7 @@ import TrackPlayer, {
 } from "react-native-track-player";
 
 // ENV import 
-import { HANYAMUSIC_URL } from "@env";
+// import { HANYAMUSIC_URL } from "@env"; // No longer using static env URL
 
 
 // Service Manager
@@ -312,7 +312,7 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
 
   const playTrack = async (track: any) => {
     try {
-      const API_BASE_URL = HANYAMUSIC_URL;
+      const API_BASE_URL = await ServiceManager.getHanyaMusicUrl();
 
       const currentState = await TrackPlayer.getState();
       const hasCurrentTrack = currentTrack && currentState === State.Playing;
