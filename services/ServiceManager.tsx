@@ -8,14 +8,24 @@ export class ServiceManager {
 
     /**
      * Fetches the dynamic HANYAMUSIC_URL from Firebase.
-     * Caches the result for subsequent calls.
+     * @param forceRefresh If true, bypasses the cache and fetches from Firebase again.
      */
-    static async getHanyaMusicUrl(): Promise<string> {
-        if (this._cachedUrl) return this._cachedUrl;
+    static async getHanyaMusicUrl(forceRefresh: boolean = false): Promise<string> {
+        if (!forceRefresh && this._cachedUrl) return this._cachedUrl;
 
         try {
             console.log("ServiceManager: Fetching dynamic tunnel URL...");
             const response = await fetch(TUNNEL_URL_ENDPOINT);
+
+            if (!response.ok) {
+                throw new Error(`Firebase returned status ${response.status}`);
+            }
+
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                throw new Error(`Firebase returned non-JSON content: ${contentType}`);
+            }
+
             const url = await response.json();
 
             if (url && typeof url === 'string') {
@@ -27,7 +37,9 @@ export class ServiceManager {
         } catch (error) {
             console.error("ServiceManager: Failed to fetch tunnel URL:", error);
             // Fallback to ngrok if fetch fails (compatibility)
-            return "https://instinctually-monosodium-shawnda.ngrok-free.app";
+            const fallback = "https://instinctually-monosodium-shawnda.ngrok-free.app";
+            console.warn("ServiceManager: Using fallback URL:", fallback);
+            return fallback;
         }
     }
 

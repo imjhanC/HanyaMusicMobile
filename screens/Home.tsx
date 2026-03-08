@@ -101,37 +101,82 @@ const Home = () => {
     try {
       setData(prev => ({ ...prev, isLoading: true, errorMessage: null }));
 
-      // Fetch dynamic API base URL
-      const API_BASE_URL = await ServiceManager.getHanyaMusicUrl();
+      // Providers and multi-service geolocation strategy
+      const fetchGeoInfo = async () => {
+        const providers = [
+          { url: 'https://ipapi.co/json/', code: 'country_code', name: 'country_name' },
+          { url: 'https://freeipapi.com/api/json', code: 'countryCode', name: 'countryName' },
+          { url: 'http://ip-api.com/json', code: 'countryCode', name: 'country' }
+        ];
 
-      // Fetch country information from IP API
-      const ipResponse = await fetch('http://ip-api.com/json');
-      const ipData = await ipResponse.json();
+        for (const provider of providers) {
+          try {
+            console.log(`Home: Trying ${provider.url}...`);
+            const res = await fetch(provider.url);
+            if (res.ok) {
+              const geoData = await res.json();
+              const cCode = geoData[provider.code];
+              const cName = geoData[provider.name];
+              if (cCode && cName) return { code: cCode, name: cName };
+            }
+          } catch (e) {
+            console.warn(`Home: ${provider.url} failed:`, e);
+          }
+        }
+        return null;
+      };
 
-      const detectedCountryCode = ipData.countryCode || "US";
-      const detectedCountryName = ipData.country || "United States";
+      // 1. Start fetching API URL (force fresh) and Geolocation in parallel
+      const apiUrlPromise = ServiceManager.getHanyaMusicUrl(true);
+      const geoPromise = fetchGeoInfo();
 
-      setCountryCode(detectedCountryCode);
-      setCountryName(detectedCountryName);
+      // 2. Start fetching artists and global songs AS SOON AS the API URL is ready
+      // (Don't wait for geolocation!)
+      const artistsPromise = apiUrlPromise.then(url => fetch(`${url}/topglobalartists`));
+      const globalSongsPromise = apiUrlPromise.then(url => fetch(`${url}/topglobalsongs`));
 
-      // Fetch all three endpoints in parallel
-      const [artistsResponse, globalSongsResponse, countrySongsResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/topglobalartists`),
-        fetch(`${API_BASE_URL}/topglobalsongs`),
-        fetch(`${API_BASE_URL}/topcountrysongs/${detectedCountryCode}`),
+      // 3. Wait for BOTH API URL and Geo to fetch country-specific songs
+      const countrySongsPromise = Promise.all([apiUrlPromise, geoPromise]).then(async ([url, geo]) => {
+        let detectedCountryCode = "US";
+        if (geo) {
+          detectedCountryCode = geo.code;
+        } else {
+          // Fallback if geo fails
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          if (tz === "Asia/Kuala_Lumpur") detectedCountryCode = "MY";
+        }
+        return fetch(`${url}/topcountrysongs/${detectedCountryCode}`);
+      });
+
+      // 4. Wait for all requests to complete
+      const [artistsResponse, globalSongsResponse, countrySongsResponse, geoResult] = await Promise.all([
+        artistsPromise,
+        globalSongsPromise,
+        countrySongsPromise,
+        geoPromise
       ]);
 
-      // Check if all responses are ok
-      if (!artistsResponse.ok || !globalSongsResponse.ok || !countrySongsResponse.ok) {
-        throw new Error("Failed to fetch data");
-      }
+      // Set country info for UI
+      setCountryCode(geoResult?.code || "US");
+      setCountryName(geoResult?.name || (Intl.DateTimeFormat().resolvedOptions().timeZone === "Asia/Kuala_Lumpur" ? "Malaysia" : "United States"));
 
-      // Parse all responses
-      const [artistsData, globalSongsData, countrySongsData] = await Promise.all([
-        artistsResponse.json(),
-        globalSongsResponse.json(),
-        countrySongsResponse.json(),
-      ]);
+      // Check each response individually for better error reporting
+      if (!artistsResponse.ok) throw new Error(`Artists API error: ${artistsResponse.status}`);
+      if (!globalSongsResponse.ok) throw new Error(`Global Songs API error: ${globalSongsResponse.status}`);
+      if (!countrySongsResponse.ok) throw new Error(`Country Songs API error: ${countrySongsResponse.status}`);
+
+      // Try to parse JSON while checking content-type
+      const responses = [artistsResponse, globalSongsResponse, countrySongsResponse];
+      const parsedData = await Promise.all(responses.map(async (res, index) => {
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const type = ["Artists", "Global Songs", "Country Songs"][index];
+          throw new Error(`${type} API returned unexpected format (not JSON)`);
+        }
+        return res.json();
+      }));
+
+      const [artistsData, globalSongsData, countrySongsData] = parsedData;
 
       setData({
         topGlobalArtists: artistsData.artists || [],
@@ -141,6 +186,7 @@ const Home = () => {
         errorMessage: null,
       });
     } catch (err) {
+      console.error("Home: fetchHomeData error:", err);
       setData(prev => ({
         ...prev,
         isLoading: false,

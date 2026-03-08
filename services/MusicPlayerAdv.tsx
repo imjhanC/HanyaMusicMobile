@@ -1,4 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
 import {
   View,
   Text,
@@ -20,18 +25,12 @@ import TrackPlayer, {
 import { useMusicPlayer, MarqueeTitle } from "./MusicPlayer";
 import VideoPlayer from "./VideoPlayer";
 import { ServiceManager } from "./ServiceManager";
-// import { HANYAMUSIC_URL } from "@env";
 
-const formatTime = (secs: number) => {
-  if (!isFinite(secs) || secs < 0) secs = 0;
-  const m = Math.floor(secs / 60);
-  const s = Math.floor(secs % 60);
-  return `${m}:${s < 10 ? "0" : ""}${s}`;
-};
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface MVData {
-  stream_url: string;   // Cloudflare proxy URL — used for <Video> playback (supports 206 partial)
-  video_url: string;    // Raw YouTube video URL (kept for reference)
+  stream_url: string;     // Cloudflare proxy URL — supports HTTP 206 partial content
+  video_url: string;      // Raw YouTube URL (kept for reference)
   audio_url: string;
   title: string;
   duration: number;
@@ -41,10 +40,25 @@ export interface MVData {
   cached?: boolean;
 }
 
-// Constants for sync thresholds
-const SYNC_THRESHOLD = 0.3; // seconds - when to trigger sync
-const MAX_SYNC_ATTEMPTS = 3; // prevent infinite sync loops
-const SYNC_COOLDOWN = 2000; // ms to wait between syncs
+type RepeatMode = "off" | "once" | "track";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const SEEK_SETTLE_MS = 300;
+const VIDEO_AUTOPLAY_DELAY_MS = 150;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const formatTime = (secs: number): string => {
+  if (!isFinite(secs) || secs < 0) secs = 0;
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
+
+
+// ─── MusicPlayerAdv ───────────────────────────────────────────────────────────
 
 export default function MusicPlayerAdv() {
   const {
@@ -64,15 +78,14 @@ export default function MusicPlayerAdv() {
   const { position, duration } = useProgress();
   const playbackState = usePlaybackState();
 
+  // ── UI state ──────────────────────────────────────────────────────────────
   const [barWidth, setBarWidth] = useState(0);
   const [previewSec, setPreviewSec] = useState<number | null>(null);
   const [isShuffle, setIsShuffle] = useState(false);
-  const [isTitleOverflowing, setIsTitleOverflowing] = useState(true);
   const [titleContainerWidth, setTitleContainerWidth] = useState(0);
+  const [isTitleOverflowing, setIsTitleOverflowing] = useState(true);
 
-  // ── Video mode ────────────────────────────────────────────────────────────
-  // stream_url = Cloudflare proxy, combined video+audio (206 partial content)
-  // In video mode: <Video> owns playback entirely; TrackPlayer is paused/silent.
+  // ── Video state ───────────────────────────────────────────────────────────
   const [mvData, setMvData] = useState<MVData | null>(null);
   const [isMVLoading, setIsMVLoading] = useState(false);
   const [mvError, setMVError] = useState<string | null>(null);
@@ -81,41 +94,51 @@ export default function MusicPlayerAdv() {
   const [videoPaused, setVideoPaused] = useState(true);
   const [videoKey, setVideoKey] = useState(0);
   const [videoBuffering, setVideoBuffering] = useState(false);
-  // Standalone position/duration tracked from the video's onProgress
   const [videoPosition, setVideoPosition] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
 
-  const videoPlayerRef = useRef<any>(null);
+  // ── Refs ──────────────────────────────────────────────────────────────────
+  const videoRef = useRef<any>(null);
   const originalAudioUrlRef = useRef<string | null>(null);
   const originalTrackMetaRef = useRef<any>(null);
   const pendingSeekRef = useRef<number | null>(null);
   const isSeekingRef = useRef(false);
   const videoPausedRef = useRef(true);
-  const isVideoModeRef = useRef(false);
 
   useEffect(() => { videoPausedRef.current = videoPaused; }, [videoPaused]);
-  useEffect(() => { isVideoModeRef.current = mvData !== null; }, [mvData]);
 
+  // ── Derived ───────────────────────────────────────────────────────────────
   const isVideoMode = mvData !== null;
+  const isAudioPlaying = playbackState?.state === State.Playing && !isTransitioning;
 
-  // In video mode use the video's own position/duration; otherwise use TrackPlayer's
-  const activePos = isVideoMode ? (previewSec ?? pendingSeekRef.current ?? videoPosition) : (previewSec ?? pendingSeekRef.current ?? position);
+  const activePos = isVideoMode
+    ? (previewSec ?? pendingSeekRef.current ?? videoPosition)
+    : (previewSec ?? pendingSeekRef.current ?? position);
+
   const activeDur = isVideoMode ? videoDuration : duration;
-  const effectivePos = activePos;
+
+  const showLoading =
+    isTrackLoading ||
+    isTransitioning ||
+    (isVideoMode && (videoBuffering || !isVideoReady));
+
+  const showPlayingIcon = isVideoMode ? !videoPaused : isAudioPlaying;
+  const progressFraction = activeDur > 0 ? activePos / activeDur : 0;
+  const thumbLeft = Math.max(0, Math.min(progressFraction * barWidth, barWidth)) - 8;
+
   const titleText = currentTrack?.title || currentTrack?.song_name || "";
+  const artistText = currentTrack?.uploader || currentTrack?.artist_name || "";
 
-  const setVideoPlaying = (playing: boolean) => {
-    videoPausedRef.current = !playing;
-    setVideoPaused(!playing);
-  };
+  useEffect(() => {
+    setIsTitleOverflowing(true); // reset whenever track changes
+  }, [titleText]);
 
-  useEffect(() => { setIsTitleOverflowing(true); }, [titleText]);
-
-  // Reset video state on track change
+  // ── Reset on track change ─────────────────────────────────────────────────
   useEffect(() => {
     setMvData(null);
     setIsVideoReady(false);
-    setVideoPlaying(false);
+    setVideoPaused(true);
+    videoPausedRef.current = true;
     setMVError(null);
     setIsFullscreen(false);
     setVideoPosition(0);
@@ -124,80 +147,75 @@ export default function MusicPlayerAdv() {
     originalTrackMetaRef.current = null;
   }, [currentTrack?.title, currentTrack?.song_name]);
 
-  // Handle video progress — this IS the source of truth in video mode
-  const handleVideoProgress = (data: { currentTime: number }) => {
-    if (!isSeekingRef.current) {
-      setVideoPosition(data.currentTime);
-    }
-  };
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const setVideoPlaying = useCallback((playing: boolean) => {
+    videoPausedRef.current = !playing;
+    setVideoPaused(!playing);
+  }, []);
 
-  if (!isAdvOpen || !currentTrack) return null;
-
-  const isPlaying = playbackState?.state === State.Playing && !isTransitioning;
-  const showLoading = isTrackLoading || isTransitioning || (isVideoMode && (videoBuffering || !isVideoReady));
-
-  const showPlayingIcon = isVideoMode ? !videoPaused : isPlaying;
-
-  // ── Seek ─────────────────────────────────────────────────────────────────
-  const handleSeekFromX = async (x: number) => {
-    const seekDur = isVideoMode ? activeDur : duration;
-    if (barWidth <= 0 || !seekDur || seekDur <= 0) return;
-    const target = Math.max(0, Math.min(1, x / barWidth)) * seekDur;
+  // ── Seek ──────────────────────────────────────────────────────────────────
+  const handleSeek = useCallback(async (x: number) => {
+    if (barWidth <= 0 || !activeDur || activeDur <= 0) return;
+    const target = Math.max(0, Math.min(1, x / barWidth)) * activeDur;
 
     isSeekingRef.current = true;
     pendingSeekRef.current = target;
 
     try {
       if (isVideoMode) {
-        // Video mode: only seek the video player — it owns audio too
-        if (videoPlayerRef.current && isVideoReady) {
-          videoPlayerRef.current.seek(target);
+        if (videoRef.current && isVideoReady) {
+          videoRef.current.seek(target);
           setVideoPosition(target);
         }
       } else {
-        // Audio mode: only seek TrackPlayer
         await TrackPlayer.seekTo(target);
       }
-    } catch (error) {
-      console.error("[Seek] error:", error);
+    } catch (err) {
+      console.error("[Seek] error:", err);
     }
 
     setTimeout(() => {
       pendingSeekRef.current = null;
       isSeekingRef.current = false;
-    }, 300);
-  };
+    }, SEEK_SETTLE_MS);
+  }, [activeDur, barWidth, isVideoMode, isVideoReady]);
 
-  const togglePlayPause = async () => {
+  // ── Play / Pause ──────────────────────────────────────────────────────────
+  const togglePlayPause = useCallback(async () => {
     if (isVideoMode) {
-      // Video mode: only control the video component — it owns playback/audio
-      setVideoPlaying(videoPausedRef.current); // if paused → play, if playing → pause
+      setVideoPlaying(videoPausedRef.current);
     } else {
       const s = await TrackPlayer.getState();
       if (s === State.Playing) await TrackPlayer.pause();
       else await TrackPlayer.play();
     }
-  };
+  }, [isVideoMode, setVideoPlaying]);
 
-  const handleSkipNext = async () => {
+  // ── Skip next (shuffle-aware) ─────────────────────────────────────────────
+  const handleSkipNext = useCallback(async () => {
     if (isShuffle && queue.length > 1) {
-      playTrack({ ...queue[Math.floor(Math.random() * queue.length)], isSearchBased: true });
+      const random = queue[Math.floor(Math.random() * queue.length)];
+      playTrack({ ...random, isSearchBased: true });
     } else {
       await skipNext();
     }
-  };
+  }, [isShuffle, queue, playTrack, skipNext]);
 
-  const toggleRepeat = () => {
-    if (repeatMode === "off") setRepeatMode("once");
-    else if (repeatMode === "once") setRepeatMode("track");
-    else setRepeatMode("off");
-  };
+  // ── Repeat cycle ──────────────────────────────────────────────────────────
+  const cycleRepeat = useCallback(() => {
+    const next: Record<RepeatMode, RepeatMode> = {
+      off: "once",
+      once: "track",
+      track: "off",
+    };
+    setRepeatMode(next[repeatMode as RepeatMode] ?? "off");
+  }, [repeatMode, setRepeatMode]);
 
-  // ── Video / Audio switch ──────────────────────────────────────────────────
-  const handleVideoSwitch = async () => {
+  // ── Video: switch to / from MV ────────────────────────────────────────────
+  const handleVideoSwitch = useCallback(async () => {
     if (isVideoMode) {
-      // ── Switch BACK to audio ────────────────────────────────────────────
-      const snapPos = videoPosition; // capture position before clearing state
+      // ── Restore audio ────────────────────────────────────────────────────
+      const snapPos = videoPosition;
       const savedUrl = originalAudioUrlRef.current;
       const savedMeta = originalTrackMetaRef.current;
 
@@ -219,22 +237,20 @@ export default function MusicPlayerAdv() {
             artist: savedMeta.artist,
             artwork: savedMeta.artwork,
           });
-          await new Promise(r => setTimeout(r, 150));
+          await new Promise((r) => setTimeout(r, 150));
           await TrackPlayer.seekTo(snapPos);
           await TrackPlayer.play();
         } catch (e: any) {
-          console.error("[MV] restore audio error:", e?.message || e);
+          console.error("[MV] restore audio error:", e?.message ?? e);
           try { await TrackPlayer.play(); } catch (_) { }
         }
       }
       return;
     }
 
-    // ── Switch TO video ───────────────────────────────────────────────────
-    // stream_url is a Cloudflare proxy that combines video+audio into a single
-    // HTTP-206 stream — no separate TrackPlayer audio needed.
+    // ── Fetch MV ─────────────────────────────────────────────────────────
     const songTitle = currentTrack?.title || currentTrack?.song_name || "";
-    const artistName = currentTrack?.uploader || currentTrack?.artist_name || "";
+    const artist = currentTrack?.uploader || currentTrack?.artist_name || "";
 
     if (!songTitle) {
       setMVError("No song title — cannot search for MV.");
@@ -247,116 +263,122 @@ export default function MusicPlayerAdv() {
     setVideoBuffering(false);
 
     try {
-      const API_BASE_URL = await ServiceManager.getHanyaMusicUrl();
+      const baseUrl = await ServiceManager.getHanyaMusicUrl();
       const reqUrl =
-        `${API_BASE_URL}/search/exactwithMVMobile` +
+        `${baseUrl}/search/exactwithMVMobile` +
         `?song_title=${encodeURIComponent(songTitle)}` +
-        `&artist=${encodeURIComponent(artistName)}`;
+        `&artist=${encodeURIComponent(artist)}`;
 
       console.log("[MV] Fetching:", reqUrl);
       const res = await fetch(reqUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const ct = res.headers.get("content-type") ?? "";
+      if (!ct.includes("application/json")) throw new Error("MV API returned non-JSON");
+
       const data: MVData = await res.json();
-
       if (!data.stream_url) throw new Error("Response missing stream_url");
-      console.log("[MV] stream_url:", data.stream_url);
-      console.log("[MV] quality:", data.quality, "| cached:", data.cached);
 
-      // Snapshot current audio position for later restore
+      console.log("[MV] stream_url:", data.stream_url, "| quality:", data.quality, "| cached:", data.cached);
+
+      // Snapshot audio before handing off to video
       const snapPos = position;
-      originalAudioUrlRef.current = currentTrack.audio_url || currentTrack.url || "";
+      originalAudioUrlRef.current = currentTrack?.audio_url || currentTrack?.url || "";
       originalTrackMetaRef.current = {
-        title: currentTrack.title || currentTrack.song_name || "",
-        artist: currentTrack.uploader || currentTrack.artist_name || "",
-        artwork: currentTrack.thumbnail_url || currentTrack.thumbnail || "",
+        title: currentTrack?.title || currentTrack?.song_name || "",
+        artist: currentTrack?.uploader || currentTrack?.artist_name || "",
+        artwork: currentTrack?.thumbnail_url || currentTrack?.thumbnail || "",
         snapPos,
       };
 
-      // Pause TrackPlayer — video+audio will come from stream_url
+      // Pause TrackPlayer — stream_url carries video + audio
       try { await TrackPlayer.pause(); } catch (_) { }
 
-      // Pre-set duration from API data
       setVideoDuration(data.duration || 0);
       setVideoPosition(snapPos);
-
-      // Mount video
-      setVideoKey(prev => prev + 1);
+      setVideoKey((k) => k + 1);
       setMvData(data);
-      setVideoPlaying(false); // will autoplay after load
-
+      setVideoPlaying(false); // autoplay triggered by onLoad
     } catch (e: any) {
-      console.error("[MV] error:", e?.message || e);
-      setMVError("Couldn't load MV: " + (e?.message || "unknown error"));
+      console.error("[MV] error:", e?.message ?? e);
+      setMVError("Couldn't load MV: " + (e?.message ?? "unknown error"));
       setVideoPlaying(false);
-      // Resume audio on failure
       try { await TrackPlayer.play(); } catch (_) { }
     } finally {
       setIsMVLoading(false);
     }
-  };
+  }, [isVideoMode, currentTrack, position, setVideoPlaying, videoPosition]);
 
-  const handleVideoLoad = (meta: any) => {
+  // ── Video callbacks ───────────────────────────────────────────────────────
+  const handleVideoLoad = useCallback((meta: any) => {
     console.log("[Video] Loaded. Duration:", meta?.duration);
     setIsVideoReady(true);
     setVideoBuffering(false);
     if (meta?.duration) setVideoDuration(meta.duration);
 
-    // Seek to audio position then autoplay
     const snapPos = originalTrackMetaRef.current?.snapPos ?? 0;
-    if (videoPlayerRef.current && snapPos > 0) {
-      videoPlayerRef.current.seek(snapPos);
-    }
-    setTimeout(() => setVideoPlaying(true), 150);
-  };
+    if (videoRef.current && snapPos > 0) videoRef.current.seek(snapPos);
+    setTimeout(() => setVideoPlaying(true), VIDEO_AUTOPLAY_DELAY_MS);
+  }, [setVideoPlaying]);
 
-  const handleVideoBuffer = ({ isBuffering }: { isBuffering: boolean }) => {
+  const handleVideoProgress = useCallback(({ currentTime }: { currentTime: number }) => {
+    if (!isSeekingRef.current) setVideoPosition(currentTime);
+  }, []);
+
+  const handleVideoBuffer = useCallback(({ isBuffering }: { isBuffering: boolean }) => {
     console.log("[Video] Buffering:", isBuffering);
     setVideoBuffering(isBuffering);
-  };
+  }, []);
 
-  const handleVideoError = (e: any) => {
+  const handleVideoError = useCallback((e: any) => {
     console.error("[Video] Error:", e);
-    setMVError("Video playback error — " + (e?.error?.localizedDescription || e?.error?.domain || JSON.stringify(e?.error || e)));
+    setMVError(
+      "Video playback error — " +
+      (e?.error?.localizedDescription || e?.error?.domain || JSON.stringify(e?.error ?? e))
+    );
     setVideoBuffering(false);
-  };
+  }, []);
 
-  const circlePosition = (effectivePos / (activeDur || 1)) * barWidth;
-  const clampedPosition = Math.max(0, Math.min(circlePosition, barWidth));
+  const handleVideoSeekComplete = useCallback(({ currentTime }: { currentTime: number }) => {
+    console.log("[Video] Seek completed:", currentTime);
+    if (!isSeekingRef.current) setVideoPosition(currentTime);
+  }, []);
 
-  // ── Full-screen ───────────────────────────────────────────────────────────
+  // ── Fullscreen sync ───────────────────────────────────────────────────────
+  const handleFullscreenClose = useCallback((pos: number, dur: number) => {
+    setVideoPosition(pos);
+    if (dur > 0) setVideoDuration(dur);
+    setIsFullscreen(false);
+  }, []);
+
+  const handleFullscreenSeek = useCallback((t: number) => {
+    isSeekingRef.current = true;
+    pendingSeekRef.current = t;
+    setVideoPosition(t);
+    videoRef.current?.seek(t);
+    setTimeout(() => {
+      pendingSeekRef.current = null;
+      isSeekingRef.current = false;
+    }, SEEK_SETTLE_MS);
+  }, []);
+
+  // ── Guard ─────────────────────────────────────────────────────────────────
+  if (!isAdvOpen || !currentTrack) return null;
+
+  // ── Fullscreen render ─────────────────────────────────────────────────────
   if (isFullscreen && mvData) {
     return (
       <VideoPlayer
         mvData={mvData}
-        onClose={(pos, dur) => {
-          // Sync position and duration back when user collapses to mini-player
-          setVideoPosition(pos);
-          if (dur > 0) setVideoDuration(dur);
-          setIsFullscreen(false);
-        }}
-        onDurationChange={(dur) => {
-          // Update duration immediately when video metadata is read
-          if (dur > 0) setVideoDuration(dur);
-        }}
+        onClose={handleFullscreenClose}
+        onDurationChange={(dur) => { if (dur > 0) setVideoDuration(dur); }}
         isPlaying={!videoPaused}
         onPlayPause={togglePlayPause}
         onSkipNext={handleSkipNext}
         onSkipPrevious={async () => skipPrevious()}
-        position={effectivePos}
+        position={activePos}
         duration={activeDur}
-        onSeek={(t) => {
-          isSeekingRef.current = true;
-          pendingSeekRef.current = t;
-          setVideoPosition(t);
-          // Also seek the mini-player videoRef so it's in sync when collapsing
-          if (videoPlayerRef.current) {
-            videoPlayerRef.current.seek(t);
-          }
-          setTimeout(() => {
-            pendingSeekRef.current = null;
-            isSeekingRef.current = false;
-          }, 300);
-        }}
+        onSeek={handleFullscreenSeek}
       />
     );
   }
@@ -366,38 +388,36 @@ export default function MusicPlayerAdv() {
     <View style={styles.overlay} pointerEvents="box-none">
       <SafeAreaView style={styles.container} edges={["top"]}>
 
+        {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={closeAdv} style={styles.headerButton}>
+          <TouchableOpacity
+            onPress={closeAdv}
+            style={styles.iconBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <Ionicons name="chevron-down" size={28} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Now Playing</Text>
-          <View style={styles.headerButton} />
+          <View style={styles.iconBtn} />
         </View>
 
         <View style={styles.content}>
 
+          {/* ── Artwork / Video ─────────────────────────────────────────── */}
           {isVideoMode && mvData ? (
-            <View style={styles.videoContainer}>
+            <View style={styles.videoWrapper}>
               <Video
-                ref={videoPlayerRef}
-                key={`video-${videoKey}`}
+                ref={videoRef}
+                key={`mv-${videoKey}`}
                 source={{ uri: mvData.stream_url }}
-                style={styles.videoPlayer}
-                muted={false}           // stream_url carries video+audio; play both
+                style={StyleSheet.absoluteFill}
+                muted={false}
                 paused={videoPaused}
                 resizeMode={ResizeMode.CONTAIN}
                 repeat={false}
                 ignoreSilentSwitch="ignore"
                 playInBackground={false}
                 playWhenInactive={false}
-                onLoad={handleVideoLoad}
-                onProgress={handleVideoProgress}
-                onError={handleVideoError}
-                onBuffer={handleVideoBuffer}
-                onSeek={(data) => {
-                  console.log("[Video] Seek completed:", data.currentTime);
-                  if (!isSeekingRef.current) setVideoPosition(data.currentTime);
-                }}
                 progressUpdateInterval={250}
                 bufferConfig={{
                   minBufferMs: 2500,
@@ -405,21 +425,28 @@ export default function MusicPlayerAdv() {
                   bufferForPlaybackMs: 1000,
                   bufferForPlaybackAfterRebufferMs: 2000,
                 }}
+                onLoad={handleVideoLoad}
+                onProgress={handleVideoProgress}
+                onBuffer={handleVideoBuffer}
+                onError={handleVideoError}
+                onSeek={handleVideoSeekComplete}
               />
+
               {(videoBuffering || !isVideoReady) && (
-                <View style={styles.videoLoadingOverlay}>
+                <View style={styles.videoOverlay}>
                   <ActivityIndicator size="large" color="#1DB954" />
                   {!isVideoReady && (
-                    <Text style={styles.loadingText}>Loading video...</Text>
+                    <Text style={styles.videoLoadingLabel}>Loading video…</Text>
                   )}
                 </View>
               )}
+
               <TouchableOpacity
-                style={styles.expandButton}
+                style={styles.expandBtn}
                 activeOpacity={0.8}
                 onPress={() => setIsFullscreen(true)}
               >
-                <Ionicons name="expand" size={20} color="#fff" />
+                <Ionicons name="expand" size={18} color="#fff" />
               </TouchableOpacity>
             </View>
           ) : (
@@ -429,16 +456,17 @@ export default function MusicPlayerAdv() {
             />
           )}
 
-          <View style={styles.titleRow}>
+          {/* ── Track info ─────────────────────────────────────────────── */}
+          <View style={styles.infoRow}>
             <View
-              style={styles.textContainer}
-              onLayout={(e: LayoutChangeEvent) => setTitleContainerWidth(e.nativeEvent.layout.width)}
+              style={styles.infoLeft}
+              onLayout={(e: LayoutChangeEvent) =>
+                setTitleContainerWidth(e.nativeEvent.layout.width)
+              }
             >
+              {/* Video / Audio mode pill */}
               <TouchableOpacity
-                style={[
-                  styles.videoSwitchButton,
-                  isVideoMode && styles.videoSwitchButtonActive,
-                ]}
+                style={[styles.modePill, isVideoMode && styles.modePillActive]}
                 activeOpacity={0.7}
                 onPress={handleVideoSwitch}
                 disabled={isMVLoading}
@@ -448,102 +476,129 @@ export default function MusicPlayerAdv() {
                 ) : (
                   <Ionicons
                     name={isVideoMode ? "musical-notes" : "videocam"}
-                    size={14}
+                    size={13}
                     color="#fff"
                   />
                 )}
-                <Text style={styles.videoSwitchText}>
-                  {isMVLoading ? "Loading…" : isVideoMode ? "Switch to audio" : "Switch to video"}
+                <Text style={styles.modePillText}>
+                  {isMVLoading
+                    ? "Loading…"
+                    : isVideoMode
+                      ? "Switch to audio"
+                      : "Switch to video"}
                 </Text>
               </TouchableOpacity>
 
-              {mvError != null && (
-                <Text style={styles.mvErrorText}>{mvError}</Text>
-              )}
+              {mvError && <Text style={styles.errorText}>{mvError}</Text>}
 
+              {/* Scrolling title */}
               {isTitleOverflowing ? (
-                <MarqueeTitle text={titleText} textStyle={styles.title} />
+                <MarqueeTitle text={titleText} textStyle={styles.trackTitle} />
               ) : (
-                <Text style={styles.title} numberOfLines={1}>{titleText}</Text>
+                <Text style={styles.trackTitle} numberOfLines={1}>
+                  {titleText}
+                </Text>
               )}
 
+              {/* Invisible measuring text */}
               <Text
-                style={[styles.title, { position: "absolute", opacity: 0, width: 3000 }]}
+                style={[
+                  styles.trackTitle,
+                  { position: "absolute", opacity: 0, width: 3000, zIndex: -1 },
+                ]}
                 numberOfLines={1}
                 onTextLayout={(e) => {
                   if (titleContainerWidth > 0 && e.nativeEvent.lines[0]) {
-                    setIsTitleOverflowing(e.nativeEvent.lines[0].width > titleContainerWidth);
+                    setIsTitleOverflowing(
+                      e.nativeEvent.lines[0].width > titleContainerWidth
+                    );
                   }
                 }}
               >
                 {titleText}
               </Text>
 
-              <Text style={styles.artist} numberOfLines={1}>
-                {currentTrack.uploader || currentTrack.artist_name}
+              <Text style={styles.trackArtist} numberOfLines={1}>
+                {artistText}
               </Text>
             </View>
 
-            <TouchableOpacity style={styles.addButton}>
+            <TouchableOpacity
+              style={styles.addBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Ionicons name="add-circle-outline" size={30} color="#fff" />
             </TouchableOpacity>
           </View>
 
+          {/* ── Progress bar ────────────────────────────────────────────── */}
           <View
-            style={styles.progressContainer}
+            style={styles.progressWrap}
             onLayout={(e: LayoutChangeEvent) => setBarWidth(e.nativeEvent.layout.width)}
           >
-            <View style={styles.progressBarBg} />
+            <View style={styles.progressTrack} />
             <View
               style={[
-                styles.progressBarFg,
-                { width: `${(effectivePos / (activeDur || 1)) * 100 || 0}%` },
+                styles.progressFill,
+                { width: `${progressFraction * 100}%` },
               ]}
             />
             {barWidth > 0 && (
-              <View style={[styles.progressThumb, { left: clampedPosition - 8 }]}>
-                <View style={styles.progressThumbInner} />
-              </View>
+              <View style={[styles.thumb, { left: thumbLeft }]} />
             )}
             <View
-              style={styles.touchableArea}
+              style={styles.progressTouchArea}
               onStartShouldSetResponder={() => true}
               onMoveShouldSetResponder={() => true}
               onResponderGrant={(e) => {
                 const x = e.nativeEvent.locationX;
-                if (duration) setPreviewSec(Math.max(0, Math.min(duration, (x / barWidth) * duration)));
+                const dur = isVideoMode ? activeDur : duration;
+                if (dur) setPreviewSec(Math.max(0, Math.min(dur, (x / barWidth) * dur)));
               }}
               onResponderMove={(e) => {
                 const x = e.nativeEvent.locationX;
-                if (duration) setPreviewSec(Math.max(0, Math.min(duration, (x / barWidth) * duration)));
+                const dur = isVideoMode ? activeDur : duration;
+                if (dur) setPreviewSec(Math.max(0, Math.min(dur, (x / barWidth) * dur)));
               }}
               onResponderRelease={async (e) => {
-                const x = e.nativeEvent.locationX;
                 setPreviewSec(null);
-                await handleSeekFromX(x);
+                await handleSeek(e.nativeEvent.locationX);
               }}
             />
           </View>
 
+          {/* ── Time ───────────────────────────────────────────────────── */}
           <View style={styles.timeRow}>
-            <Text style={styles.timeText}>{formatTime(effectivePos || 0)}</Text>
-            <Text style={styles.timeText}>{formatTime(activeDur || 0)}</Text>
+            <Text style={styles.timeText}>{formatTime(activePos)}</Text>
+            <Text style={styles.timeText}>{formatTime(activeDur)}</Text>
           </View>
 
-          <View style={styles.controlsRow}>
-            <TouchableOpacity onPress={() => setIsShuffle(!isShuffle)} style={styles.sideButton}>
-              <Ionicons name="shuffle" size={24} color={isShuffle ? "#1DB954" : "#fff"} />
-              {isShuffle && <View style={styles.activeDot} />}
+          {/* ── Controls ────────────────────────────────────────────────── */}
+          <View style={styles.controls}>
+            {/* Shuffle */}
+            <TouchableOpacity
+              style={styles.sideBtn}
+              onPress={() => setIsShuffle((v) => !v)}
+            >
+              <Ionicons
+                name="shuffle"
+                size={24}
+                color={isShuffle ? "#1DB954" : "#fff"}
+              />
+              {isShuffle && <View style={styles.dot} />}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => skipPrevious()} style={styles.skipButton}>
+            {/* Previous */}
+            <TouchableOpacity style={styles.skipBtn} onPress={() => skipPrevious()}>
               <Ionicons name="play-skip-back" size={36} color="#fff" />
             </TouchableOpacity>
 
+            {/* Play / Pause */}
             <TouchableOpacity
+              style={styles.playBtn}
               onPress={togglePlayPause}
-              style={styles.playPauseButton}
               disabled={showLoading}
+              activeOpacity={0.85}
             >
               {showLoading ? (
                 <ActivityIndicator size="large" color="#000" />
@@ -552,25 +607,29 @@ export default function MusicPlayerAdv() {
                   name={showPlayingIcon ? "pause" : "play"}
                   size={42}
                   color="#000"
-                  style={!showPlayingIcon ? { marginLeft: 4 } : {}}
+                  style={!showPlayingIcon ? { marginLeft: 4 } : undefined}
                 />
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={handleSkipNext} style={styles.skipButton}>
+            {/* Next */}
+            <TouchableOpacity style={styles.skipBtn} onPress={handleSkipNext}>
               <Ionicons name="play-skip-forward" size={36} color="#fff" />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={toggleRepeat} style={styles.sideButton}>
+            {/* Repeat */}
+            <TouchableOpacity style={styles.sideBtn} onPress={cycleRepeat}>
               <Ionicons
                 name="repeat"
                 size={24}
-                color={repeatMode === "once" || repeatMode === "track" ? "#1DB954" : "#fff"}
+                color={repeatMode !== "off" ? "#1DB954" : "#fff"}
               />
-              {(repeatMode === "once" || repeatMode === "track") && (
+              {repeatMode !== "off" && (
                 <>
-                  <View style={styles.activeDot} />
-                  {repeatMode === "track" && <Text style={styles.repeatOneText}>1</Text>}
+                  <View style={styles.dot} />
+                  {repeatMode === "track" && (
+                    <Text style={styles.repeatOneLabel}>1</Text>
+                  )}
                 </>
               )}
             </TouchableOpacity>
@@ -582,19 +641,26 @@ export default function MusicPlayerAdv() {
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+  // Layout
   overlay: {
-    position: "absolute",
-    left: 0, right: 0, top: 0, bottom: 0,
-    backgroundColor: "#121212",
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#0e0e0e",
     zIndex: 9999,
   },
   container: {
     flex: 1,
-    backgroundColor: "#121212",
-    paddingBottom: 90
+    paddingBottom: 90,
   },
+  content: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+
+  // Header
   header: {
     height: 56,
     flexDirection: "row",
@@ -602,167 +668,171 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#333",
+    borderBottomColor: "#2a2a2a",
   },
-  headerButton: {
+  iconBtn: {
     width: 40,
     height: 40,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
   },
   headerTitle: {
     color: "#fff",
-    fontSize: 20,
-    fontWeight: "600"
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
-  content: {
-    flex: 1,
-    alignItems: "center",
-    padding: 16
-  },
+
+  // Artwork
   artwork: {
     width: 280,
     height: 280,
-    borderRadius: 12,
+    borderRadius: 16,
     marginTop: 12,
-    marginBottom: 16
+    marginBottom: 20,
   },
-  videoContainer: {
-    width: Dimensions.get("window").width - 20,
-    height: 200,
-    borderRadius: 12,
-    marginTop: 12,
-    marginBottom: 16,
+
+  // Video
+  videoWrapper: {
+    width: SCREEN_WIDTH - 20,
+    height: 205,
+    borderRadius: 14,
+    marginTop: 49.5,
+    marginBottom: 57.5,
     overflow: "hidden",
     backgroundColor: "#000",
-    position: "relative",
   },
-  videoPlayer: {
-    width: "100%",
-    height: "100%"
-  },
-  videoLoadingOverlay: {
+  videoOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "rgba(0,0,0,0.65)",
     justifyContent: "center",
     alignItems: "center",
   },
-  loadingText: {
-    color: "#fff",
-    marginTop: 8,
+  videoLoadingLabel: {
+    color: "#ccc",
     fontSize: 12,
+    marginTop: 8,
   },
-  expandButton: {
+  expandBtn: {
     position: "absolute",
-    bottom: 8,
-    right: 8,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    padding: 6,
+    bottom: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    padding: 7,
     borderRadius: 20,
-    zIndex: 10,
   },
-  titleRow: {
+
+  // Track info
+  infoRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     width: "90%",
-    marginTop: 20,
+    marginTop: 16,
+    minHeight: 80,
   },
-  textContainer: {
+  infoLeft: {
     flex: 1,
-    alignItems: "flex-start"
+    minWidth: 0, // critical: lets flex children shrink below their natural width
+    alignItems: "flex-start",
   },
-  addButton: {
+  addBtn: {
     width: 40,
     height: 40,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 20,
-    marginTop: 30,
+    marginLeft: 16,
+    alignSelf: "flex-end",
   },
-  videoSwitchButton: {
+
+  // Mode pill
+  modePill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(50,50,50,0.7)",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 15,
-    marginBottom: 8,
-    minWidth: 150,
-    zIndex: 1000,
-    elevation: 10,
-  },
-  videoSwitchButtonActive: {
-    backgroundColor: "rgba(29,185,84,0.25)",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginBottom: 10,
+    alignSelf: "flex-start",
     borderWidth: 1,
+    borderColor: "transparent",
+    height: 32,
+    minWidth: 150,
+  },
+  modePillActive: {
+    backgroundColor: "rgba(29,185,84,0.15)",
     borderColor: "#1DB954",
   },
-  videoSwitchText: {
-    color: "#fff",
-    fontSize: 11,
+  modePillText: {
+    color: "#e0e0e0",
+    fontSize: 10,
     fontWeight: "700",
-    marginLeft: 6,
+    marginLeft: 5,
     textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  mvErrorText: {
+  errorText: {
     color: "#ff6b6b",
     fontSize: 11,
     marginBottom: 4,
-    flexShrink: 1
   },
-  title: {
-    color: "#fff",
+
+  // Title & artist
+  trackTitle: {
+    color: "#ffffff",
     fontSize: 22,
-    fontWeight: "bold",
-    textAlign: "left"
+    fontWeight: "700",
+    letterSpacing: -0.2,
+    marginBottom: 1,
+    marginRight: 20,
+    lineHeight: 25,
   },
-  artist: {
-    color: "#bbb",
-    fontSize: 16,
-    marginBottom: -18,
-    textAlign: "left"
+  trackArtist: {
+    color: "#888",
+    fontSize: 15,
+    marginBottom: -10,
+    fontWeight: "500",
   },
-  progressContainer: {
+
+  // Progress bar
+  progressWrap: {
     width: "90%",
     height: 30,
-    marginTop: 30,
+    marginTop: 28,
     justifyContent: "center",
     position: "relative",
   },
-  progressBarBg: {
+  progressTrack: {
     position: "absolute",
     left: 0,
     right: 0,
-    height: 4,
-    backgroundColor: "#333",
+    height: 3,
+    backgroundColor: "#2d2d2d",
     borderRadius: 2,
   },
-  progressBarFg: {
+  progressFill: {
     position: "absolute",
     left: 0,
-    height: 4,
+    height: 3,
     backgroundColor: "#1DB954",
     borderRadius: 2,
   },
-  progressThumb: {
+  thumb: {
     position: "absolute",
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#1DB954",
-    justifyContent: "center",
-    alignItems: "center",
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#fff",
     top: "50%",
-    marginTop: -8,
-    elevation: 3,
+    marginTop: -7,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 4,
   },
-  progressThumbInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#1DB954"
-  },
-  touchableArea: {
+  progressTouchArea: {
     position: "absolute",
     left: 0,
     right: 0,
@@ -771,58 +841,70 @@ const styles = StyleSheet.create({
     marginTop: -15,
     backgroundColor: "transparent",
   },
+
+  // Time
   timeRow: {
     width: "90%",
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 8,
+    marginTop: 6,
   },
   timeText: {
-    color: "#aaa",
-    fontSize: 12
+    color: "#666",
+    fontSize: 14,
+    fontWeight: "500",
+    letterSpacing: 0.5,
+    marginTop: -2,
   },
-  controlsRow: {
+
+  // Controls
+  controls: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     width: "90%",
-    marginTop: 10,
+    marginTop: 12,
   },
-  sideButton: {
-    width: 50,
-    height: 50,
+  sideBtn: {
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
   },
-  skipButton: {
-    width: 50,
-    height: 50,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  playPauseButton: {
-    width: 65,
-    height: 65,
-    borderRadius: 36,
-    backgroundColor: "#fff",
+  skipBtn: {
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
   },
-  activeDot: {
+  playBtn: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  dot: {
     position: "absolute",
-    bottom: 4,
+    bottom: 5,
     width: 4,
     height: 4,
     borderRadius: 2,
     backgroundColor: "#1DB954",
   },
-  repeatOneText: {
+  repeatOneLabel: {
     position: "absolute",
     color: "#1DB954",
-    fontSize: 12,
-    fontWeight: "bold",
+    fontSize: 10,
+    fontWeight: "800",
     top: 8,
-    right: 10,
+    right: 9,
+    letterSpacing: -0.5,
   },
 });

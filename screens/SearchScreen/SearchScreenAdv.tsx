@@ -139,7 +139,12 @@ export default function SearchScreenAdv() {
       );
 
       if (!response.ok) {
-        throw new Error("Server error");
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server returned non-JSON content");
       }
 
       const data = await response.json();
@@ -148,7 +153,7 @@ export default function SearchScreenAdv() {
         setSearchResults(data);
         if (data.length === 0) setErrorMessage("no-results");
       } else {
-        throw new Error("Invalid data format");
+        throw new Error("Invalid search data format");
       }
     } catch (error) {
       console.error("Search failed:", error);

@@ -343,9 +343,29 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
       if (trackToPlay.isSearchBased) {
         const query = `song_title=${encodeURIComponent(trackToPlay.song_name)}&artist=${encodeURIComponent(trackToPlay.artist_name)}`;
         const response = await fetch(`${API_BASE_URL}/search/exact?${query}`);
+
+        if (!response.ok) {
+          throw new Error(`Search API error: ${response.status}`);
+        }
+
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Search API returned non-JSON content");
+        }
+
         streamData = await response.json();
       } else {
         const response = await fetch(`${API_BASE_URL}/stream/${track.videoId}`);
+
+        if (!response.ok) {
+          throw new Error(`Stream API error: ${response.status}`);
+        }
+
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Stream API returned non-JSON content");
+        }
+
         streamData = await response.json();
       }
 
