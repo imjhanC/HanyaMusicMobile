@@ -36,8 +36,10 @@ const TopGlobalArtists = ({ route, navigation }: Props) => {
     const { artists } = route.params;
 
     const renderItem = React.useCallback(({ item }: { item: Artist }) => (
-        <ArtistCard item={item} />
-    ), []);
+        <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('ArtistPage', { artist_name: item.artist_name })}>
+            <ArtistCard item={item} />
+        </TouchableOpacity>
+    ), [navigation]);
 
     const keyExtractor = React.useCallback((item: Artist) => item.rank.toString(), []);
 

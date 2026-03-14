@@ -4,18 +4,23 @@ import TrackPlayer, { State } from "react-native-track-player";
 const TUNNEL_URL_ENDPOINT = "https://hanyamusic-ac4ce-default-rtdb.asia-southeast1.firebasedatabase.app/firebase/tunnel_url.json";
 
 export class ServiceManager {
-    private static _cachedUrl: string | null = null;
 
     /**
      * Fetches the dynamic HANYAMUSIC_URL from Firebase.
-     * @param forceRefresh If true, bypasses the cache and fetches from Firebase again.
+     * @param forceRefresh Unused now as we always fetch fresh, kept for API compatibility.
      */
     static async getHanyaMusicUrl(forceRefresh: boolean = false): Promise<string> {
-        if (!forceRefresh && this._cachedUrl) return this._cachedUrl;
-
         try {
             console.log("ServiceManager: Fetching dynamic tunnel URL...");
-            const response = await fetch(TUNNEL_URL_ENDPOINT);
+            // Add a timestamp to bypass any potential CDN/Browser caching
+            const timestamp = new Date().getTime();
+            const response = await fetch(`${TUNNEL_URL_ENDPOINT}?t=${timestamp}`, {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
 
             if (!response.ok) {
                 throw new Error(`Firebase returned status ${response.status}`);
@@ -29,14 +34,14 @@ export class ServiceManager {
             const url = await response.json();
 
             if (url && typeof url === 'string') {
-                this._cachedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-                console.log("ServiceManager: Dynamic URL updated to:", this._cachedUrl);
-                return this._cachedUrl;
+                const finalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+                console.log("ServiceManager: Dynamic URL fetched:", finalizedUrl);
+                return finalizedUrl;
             }
             throw new Error("Invalid tunnel URL format received");
         } catch (error) {
             console.error("ServiceManager: Failed to fetch tunnel URL:", error);
-            // Fallback to ngrok if fetch fails (compatibility)
+            // Fallback URL if fetch fails
             const fallback = "https://instinctually-monosodium-shawnda.ngrok-free.app";
             console.warn("ServiceManager: Using fallback URL:", fallback);
             return fallback;

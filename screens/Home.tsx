@@ -34,6 +34,7 @@ type RootStackParamList = {
   TopCountrySongs: { songs: Song[]; countryName: string };
   TopGlobalArtists: { artists: Artist[] };
   TopGlobalSongs: { GlobalSongs: GlobalSong[] };
+  ArtistPage: { artist_name: string };
 };
 
 interface HomeScreenResult {
@@ -227,7 +228,7 @@ const Home = () => {
             <Text style={styles.sectionTitle}>Top Global Artists</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={true}>
               {data.topGlobalArtists.slice(0, 10).map((artist) => (
-                <TouchableOpacity key={artist.rank} activeOpacity={0.7}>
+                <TouchableOpacity key={artist.rank} activeOpacity={0.7} onPress={() => navigation.navigate('ArtistPage', { artist_name: artist.artist_name })}>
                   <ArtistCard artist={artist} />
                 </TouchableOpacity>
               ))}
