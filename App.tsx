@@ -19,6 +19,8 @@ import TopGlobalArtists from './screens/HomeScreen/TopGlobalArtists';
 import TopGlobalSongs from './screens/HomeScreen/TopGlobalSongs';
 import TopCountrySongs from './screens/HomeScreen/TopCountrySongs';
 import ArtistPage from './screens/HomeScreen/ArtistPage';
+import AlbumPage from './screens/HomeScreen/AlbumPage';
+import ArtistAlbumSongs from './screens/HomeScreen/ArtistAlbumSongs';
 
 //import CreateAccScreen from './screens/LoginScreen/CreateAccScreen';
 
@@ -51,7 +53,7 @@ export function BottomTabs() {
     <Tab.Navigator
       screenOptions={({ route, navigation }) => {
         const routeName = getFocusedRouteNameFromRoute(route) ?? "HomeMain";
-        const isHeaderHidden = ["TopGlobalArtists", "TopGlobalSongs", "TopCountrySongs", "ArtistPage"].includes(routeName);
+        const isHeaderHidden = ["TopGlobalArtists", "TopGlobalSongs", "TopCountrySongs", "ArtistPage", "AlbumPage", "ArtistAlbumSongs"].includes(routeName);
 
         return {
           headerShown: !isHeaderHidden,
@@ -105,6 +107,8 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="TopGlobalSongs" component={TopGlobalSongs} />
       <HomeStack.Screen name="TopCountrySongs" component={TopCountrySongs} />
       <HomeStack.Screen name="ArtistPage" component={ArtistPage} />
+      <HomeStack.Screen name="AlbumPage" component={AlbumPage} />
+      <HomeStack.Screen name="ArtistAlbumSongs" component={ArtistAlbumSongs} />
     </HomeStack.Navigator>
   );
 }

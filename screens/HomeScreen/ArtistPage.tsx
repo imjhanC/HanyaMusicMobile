@@ -14,12 +14,21 @@ interface SongDetails {
     preview_url: string;
 }
 
+interface TopSongDetails {
+    song_name: string;
+    album_name: string;
+    preview_url: string;
+    release_date: string;
+    thumbnail: string;
+}
+
 interface ArtistData {
     artist: string;
     total_songs: number;
     total_albums: number;
     albums: Record<string, SongDetails[]>;
     sample_thumbnails: string[];
+    top_10_songs?: TopSongDetails[];
 }
 
 const AnimatedSectionList = Animated.createAnimatedComponent(SectionList);
@@ -31,6 +40,7 @@ const ArtistPage = ({ route, navigation }: any) => {
     const [artistData, setArtistData] = useState<ArtistData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [showAllTopSongs, setShowAllTopSongs] = useState(false);
     const { playTrack } = useMusicPlayer();
 
     useEffect(() => {
@@ -91,32 +101,147 @@ const ArtistPage = ({ route, navigation }: any) => {
         data: artistData.albums[albumName]
     }));
 
-    const renderHeader = () => (
-        <View style={styles.headerContainer}>
-            {/* Banner/Thumbnails */}
-            <View style={styles.bannerContainer}>
-                {artistData.sample_thumbnails && artistData.sample_thumbnails.length > 0 ? (
-                    <Image source={{ uri: artistData.sample_thumbnails[0] }} style={styles.bannerImage} />
-                ) : (
-                    <View style={styles.bannerPlaceholder} />
-                )}
-                <View style={styles.bannerOverlay}>
-                    <Text style={styles.artistNameMain}>{artistData.artist}</Text>
-                    <View style={styles.statsContainer}>
-                        <View style={styles.statItem}>
-                            <Text style={styles.statValue}>{artistData.total_songs}</Text>
-                            <Text style={styles.statLabel}>Songs</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                            <Text style={styles.statValue}>{artistData.total_albums}</Text>
-                            <Text style={styles.statLabel}>Albums</Text>
+    const renderHeader = () => {
+        const recentReleases = Object.keys(artistData.albums).map(albumName => {
+            const firstSong = artistData.albums[albumName][0];
+            const dateValue = new Date(firstSong.release_date).getTime() || firstSong.release_year;
+            return {
+                albumName,
+                releaseDateVal: dateValue,
+                releaseYear: firstSong.release_year,
+                releaseMonth: firstSong.release_month,
+                thumbnail: firstSong.thumbnail,
+                songs: artistData.albums[albumName],
+            };
+        }).sort((a, b) => b.releaseDateVal - a.releaseDateVal).slice(0, 5);
+
+        return (
+            <View style={styles.headerContainer}>
+                {/* Banner/Thumbnails */}
+                <View style={styles.bannerContainer}>
+                    {artistData.sample_thumbnails && artistData.sample_thumbnails.length > 0 ? (
+                        <Image source={{ uri: artistData.sample_thumbnails[0] }} style={styles.bannerImage} />
+                    ) : (
+                        <View style={styles.bannerPlaceholder} />
+                    )}
+                    <View style={styles.bannerOverlay}>
+                        <Text style={styles.artistNameMain}>{artistData.artist}</Text>
+                        <View style={styles.statsContainer}>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statValue}>{artistData.total_songs}</Text>
+                                <Text style={styles.statLabel}>Songs</Text>
+                            </View>
+                            <View style={styles.statDivider} />
+                            <View style={styles.statItem}>
+                                <Text style={styles.statValue}>{artistData.total_albums}</Text>
+                                <Text style={styles.statLabel}>Albums</Text>
+                            </View>
                         </View>
                     </View>
                 </View>
+
+                {/* Top Songs by artist */}
+                {artistData.top_10_songs && artistData.top_10_songs.length > 0 && (
+                    <View style={styles.topSongsContainer}>
+                        <Text style={[styles.sectionTitle, { paddingHorizontal: 16, marginBottom: 12 }]}>
+                            Top Songs by {artistData.artist}
+                        </Text>
+                        {artistData.top_10_songs.slice(0, showAllTopSongs ? 10 : 6).map((song, index) => {
+                            const isPartiallyHidden = !showAllTopSongs && index === 5;
+
+                            const cardContent = (
+                                <TouchableOpacity
+                                    style={[styles.topSongCard, isPartiallyHidden && { opacity: 0.2 }]}
+                                    activeOpacity={isPartiallyHidden ? 1 : 0.7}
+                                    onPress={() => {
+                                        if (isPartiallyHidden) {
+                                            setShowAllTopSongs(true);
+                                        } else {
+                                            playTrack({
+                                                rank: 0,
+                                                song_name: song.song_name,
+                                                artist_name: artistData.artist,
+                                                thumbnail: song.thumbnail,
+                                                preview_url: song.preview_url
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <Text style={styles.topSongRank}>{index + 1}</Text>
+                                    <Image source={{ uri: song.thumbnail }} style={styles.songThumbnail} />
+                                    <View style={styles.songInfo}>
+                                        <Text style={styles.songName} numberOfLines={1}>{song.song_name}</Text>
+                                        <Text style={styles.songMeta} numberOfLines={1}>{song.album_name}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+
+                            if (isPartiallyHidden) {
+                                return (
+                                    <View key={index} style={{ height: 45, overflow: 'hidden' }}>
+                                        {cardContent}
+                                    </View>
+                                );
+                            }
+
+                            return <React.Fragment key={index}>{cardContent}</React.Fragment>;
+                        })}
+                        {artistData.top_10_songs.length > 5 && (
+                            <TouchableOpacity
+                                style={styles.seeMoreButton}
+                                onPress={() => setShowAllTopSongs(!showAllTopSongs)}
+                            >
+                                <Text style={styles.seeMoreText}>
+                                    {showAllTopSongs ? "Show less" : "See more"}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
+
+                {/* All Releases */}
+                {recentReleases.length > 0 && (
+                    <View style={styles.releasesContainer}>
+                        <View style={styles.releasesHeader}>
+                            <Text style={styles.sectionTitle}>All releases</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('AlbumPage', { artistName: artistData.artist, albums: artistData.albums })}>
+                                <Text style={styles.showAllText}>Show all</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {recentReleases.map((release, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                style={styles.releaseCard}
+                                activeOpacity={0.7}
+                                onPress={() => navigation.navigate('ArtistAlbumSongs', { 
+                                    artistName: artistData.artist, 
+                                    albumName: release.albumName, 
+                                    thumbnail: release.thumbnail, 
+                                    releaseMonth: release.releaseMonth, 
+                                    releaseYear: release.releaseYear, 
+                                    songs: release.songs 
+                                })}
+                            >
+                                <Image source={{ uri: release.thumbnail }} style={styles.releaseThumbnail} />
+                                <View style={styles.songInfo}>
+                                    <Text style={styles.songName} numberOfLines={1}>{release.albumName}</Text>
+                                    <Text style={styles.songMeta} numberOfLines={1}>{release.releaseYear}</Text>
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                        {Object.keys(artistData.albums).length > 5 && (
+                            <TouchableOpacity 
+                                style={styles.seeAllReleasesButton}
+                                onPress={() => navigation.navigate('AlbumPage', { artistName: artistData.artist, albums: artistData.albums })}
+                            >
+                                <Text style={styles.seeAllReleasesText} numberOfLines={1}>See all releases</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
             </View>
-        </View>
-    );
+        );
+    };
 
     const renderSongItem = ({ item }: { item: SongDetails }) => (
         <TouchableOpacity
@@ -236,6 +361,84 @@ const styles = StyleSheet.create({
     headerContainer: {
         marginBottom: 16,
     },
+    topSongsContainer: {
+        marginTop: 54,
+    },
+    releasesContainer: {
+        marginTop: 24,
+    },
+    releasesHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        paddingHorizontal: 16,
+        marginBottom: 12,
+    },
+    showAllText: {
+        color: '#b3b3b3',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    releaseCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 2,
+        marginBottom: 8,
+    },
+    releaseThumbnail: {
+        width: 80,
+        height: 80,
+        borderRadius: 8,
+        marginRight: 14,
+        backgroundColor: '#2A2A2A',
+    },
+    seeMoreButton: {
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 4,
+        marginBottom: 15,
+        marginHorizontal: 150,
+        borderWidth: 1,
+        borderColor: '#444',
+        borderRadius: 24,
+    },
+    seeMoreText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    seeAllReleasesButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        alignSelf: 'center',
+        marginTop: 4,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#444',
+        borderRadius: 24,
+    },
+    seeAllReleasesText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    topSongCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 2,
+        paddingVertical: 5,
+        marginHorizontal: 12,
+        marginBottom: 3,
+    },
+    topSongRank: {
+        color: '#b3b3b3',
+        fontSize: 16,
+        fontWeight: 'bold',
+        width: 30,
+        marginRight: 15,
+        textAlign: 'center',
+    },
     bannerContainer: {
         height: 280,
         width: '100%',
@@ -321,8 +524,8 @@ const styles = StyleSheet.create({
         borderColor: '#2A2A2A',
     },
     songThumbnail: {
-        width: 50,
-        height: 50,
+        width: 60,
+        height: 60,
         borderRadius: 8,
         marginRight: 14,
         backgroundColor: '#2A2A2A',

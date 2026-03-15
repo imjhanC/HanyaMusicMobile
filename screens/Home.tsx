@@ -217,7 +217,7 @@ const Home = () => {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 150 }}>
         {/* Top Global Artists Section */}
         <TouchableOpacity activeOpacity={0.9}
           onPress={() => navigation.navigate('TopGlobalArtists', {
