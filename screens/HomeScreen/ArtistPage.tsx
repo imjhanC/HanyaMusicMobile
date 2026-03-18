@@ -213,13 +213,13 @@ const ArtistPage = ({ route, navigation }: any) => {
                                 key={index}
                                 style={styles.releaseCard}
                                 activeOpacity={0.7}
-                                onPress={() => navigation.navigate('ArtistAlbumSongs', { 
-                                    artistName: artistData.artist, 
-                                    albumName: release.albumName, 
-                                    thumbnail: release.thumbnail, 
-                                    releaseMonth: release.releaseMonth, 
-                                    releaseYear: release.releaseYear, 
-                                    songs: release.songs 
+                                onPress={() => navigation.navigate('ArtistAlbumSongs', {
+                                    artistName: artistData.artist,
+                                    albumName: release.albumName,
+                                    thumbnail: release.thumbnail,
+                                    releaseMonth: release.releaseMonth,
+                                    releaseYear: release.releaseYear,
+                                    songs: release.songs
                                 })}
                             >
                                 <Image source={{ uri: release.thumbnail }} style={styles.releaseThumbnail} />
@@ -230,7 +230,7 @@ const ArtistPage = ({ route, navigation }: any) => {
                             </TouchableOpacity>
                         ))}
                         {Object.keys(artistData.albums).length > 5 && (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={styles.seeAllReleasesButton}
                                 onPress={() => navigation.navigate('AlbumPage', { artistName: artistData.artist, albums: artistData.albums })}
                             >
@@ -242,35 +242,6 @@ const ArtistPage = ({ route, navigation }: any) => {
             </View>
         );
     };
-
-    const renderSongItem = ({ item }: { item: SongDetails }) => (
-        <TouchableOpacity
-            style={styles.songCard}
-            activeOpacity={0.7}
-            onPress={() => playTrack({
-                rank: 0,
-                song_name: item.song_name,
-                artist_name: artistData.artist,
-                thumbnail: item.thumbnail,
-                preview_url: item.preview_url
-            })}
-        >
-            <Image source={{ uri: item.thumbnail }} style={styles.songThumbnail} />
-            <View style={styles.songInfo}>
-                <Text style={styles.songName} numberOfLines={1}>{item.song_name}</Text>
-                <Text style={styles.songMeta} numberOfLines={1}>
-                    {item.release_month} {item.release_year}
-                </Text>
-            </View>
-            <Ionicons name="play-circle" size={32} color="#1DB954" style={styles.playIcon} />
-        </TouchableOpacity>
-    );
-
-    const renderSectionHeader = ({ section }: { section: any }) => (
-        <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle} numberOfLines={1}>{section.title}</Text>
-        </View>
-    );
 
     const headerBackgroundColor = scrollY.interpolate({
         inputRange: [150, 250],
@@ -306,8 +277,7 @@ const ArtistPage = ({ route, navigation }: any) => {
             <AnimatedSectionList
                 sections={sections}
                 keyExtractor={(item: unknown, index: number) => (item as SongDetails).song_name + index}
-                renderItem={renderSongItem as any}
-                renderSectionHeader={renderSectionHeader}
+                renderItem={() => null}
                 ListHeaderComponent={renderHeader}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}

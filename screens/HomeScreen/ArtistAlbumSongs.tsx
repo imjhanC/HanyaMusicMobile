@@ -135,13 +135,18 @@ const ArtistAlbumSongs = ({ route, navigation }: any) => {
                                 preview_url: song.preview_url
                             })}
                         >
+                            <View style={styles.trackNumberContainer}>
+                                {isActive ? (
+                                    <MiniVisualizer isPlaying={isPlaying} />
+                                ) : (
+                                    <Text style={[styles.trackNumber, isActive && { color: '#1DB954' }]}>{index + 1}</Text>
+                                )}
+                            </View>
                             <View style={styles.songInfo}>
-                                <View style={styles.songTitleRow}>
-                                    {isActive && <MiniVisualizer isPlaying={isPlaying} />}
-                                    <Text style={[styles.songName, isActive && { color: '#1DB954' }]} numberOfLines={1}>{song.song_name}</Text>
-                                </View>
+                                <Text style={[styles.songName, isActive && { color: '#1DB954' }]} numberOfLines={1}>{song.song_name}</Text>
                                 <Text style={styles.songMeta} numberOfLines={1}>{artistName}</Text>
                             </View>
+                            <Ionicons name="play-circle" size={32} color={isActive ? "#1DB954" : "#b3b3b3"} />
                         </TouchableOpacity>
                     );
                 })}
@@ -216,25 +221,35 @@ const styles = StyleSheet.create({
     songCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 2,
-        paddingVertical: 5,
-        marginHorizontal: 12,
-        marginBottom: 7,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#1A1A1A',
+        marginHorizontal: 16,
+        marginBottom: 8,
+        borderRadius: 12,
+        borderWidth: 0.5,
+        borderColor: '#2A2A2A',
+    },
+    trackNumberContainer: {
+        width: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    trackNumber: {
+        color: '#b3b3b3',
+        fontSize: 15,
+        fontWeight: 'bold',
     },
     songInfo: {
         flex: 1,
         justifyContent: 'center',
-        paddingRight: 16,
-    },
-    songTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
     },
     songName: {
         color: '#fff',
         fontSize: 16,
-        fontWeight: '500',
-        flexShrink: 1,
+        fontWeight: '600',
+        marginBottom: 4,
     },
     songMeta: {
         color: '#b3b3b3',
@@ -245,7 +260,6 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
         justifyContent: 'center',
         height: 14,
-        marginRight: 8,
         width: 14,
     },
     visualizerBar: {

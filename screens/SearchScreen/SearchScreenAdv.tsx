@@ -33,10 +33,17 @@ interface SearchResult {
   duration: string;
 }
 
+interface RelatedArtist {
+  artist_name: string;
+  genre: string;
+  image: string | null;
+}
+
 export default function SearchScreenAdv() {
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [relatedArtists, setRelatedArtists] = useState<RelatedArtist[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const navigation = useNavigation();
@@ -127,6 +134,7 @@ export default function SearchScreenAdv() {
     if (!query.trim()) return;
     setIsLoading(true);
     setSearchResults([]);
+    setRelatedArtists([]);
     setErrorMessage("");
 
     // Add to search history when search is initiated
@@ -134,26 +142,44 @@ export default function SearchScreenAdv() {
 
     try {
       const API_BASE_URL = await ServiceManager.getHanyaMusicUrl();
-      const response = await fetch(
-        `${API_BASE_URL}/search?q=${encodeURIComponent(query)}`
-      );
 
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
+      const searchPromise = fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}`)
+        .catch(e => { console.error("Search request failed:", e); return null; });
+      const artistsPromise = fetch(`${API_BASE_URL}/getrelatedartists/${encodeURIComponent(query)}`)
+        .catch(e => { console.error("Artists request failed:", e); return null; });
+
+      const [searchResponse, artistsResponse] = await Promise.all([searchPromise, artistsPromise]);
+
+      let searchSuccess = false;
+
+      if (searchResponse && searchResponse.ok) {
+        const contentType = searchResponse.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const data = await searchResponse.json();
+          if (Array.isArray(data)) {
+            setSearchResults(data);
+            if (data.length === 0) setErrorMessage("no-results");
+            searchSuccess = true;
+          }
+        }
       }
 
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Server returned non-JSON content");
+      if (!searchSuccess) {
+        setErrorMessage("server-error");
       }
 
-      const data = await response.json();
-
-      if (Array.isArray(data)) {
-        setSearchResults(data);
-        if (data.length === 0) setErrorMessage("no-results");
-      } else {
-        throw new Error("Invalid search data format");
+      if (artistsResponse && artistsResponse.ok) {
+        const contentType = artistsResponse.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          try {
+            const data = await artistsResponse.json();
+            if (data && Array.isArray(data.related_artists)) {
+              setRelatedArtists(data.related_artists);
+            }
+          } catch (e) {
+            console.error("Failed to parse artists data:", e);
+          }
+        }
       }
     } catch (error) {
       console.error("Search failed:", error);
@@ -161,6 +187,48 @@ export default function SearchScreenAdv() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const renderRelatedArtists = () => {
+    if (relatedArtists.length === 0) return null;
+
+    return (
+      <View style={styles.relatedArtistsContainer}>
+        <Text style={styles.relatedArtistsTitle}>Related Artists</Text>
+        <FlatList
+          horizontal
+          data={relatedArtists}
+          keyExtractor={(item, index) => `${item.artist_name}-${index}`}
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.artistCard}
+              onPress={() => {
+                (navigation as any).navigate('HomeDrawer', {
+                  screen: 'Main',
+                  params: {
+                    screen: 'Home',
+                    params: {
+                      screen: 'ArtistPage',
+                      params: { artist_name: item.artist_name }
+                    }
+                  }
+                });
+              }}
+            >
+              {item.image ? (
+                <Image source={{ uri: item.image }} style={styles.artistImage} />
+              ) : (
+                <View style={[styles.artistImage, styles.artistPlaceholder]}>
+                  <Ionicons name="person" size={40} color="#888" />
+                </View>
+              )}
+              <Text style={styles.artistName}>{item.artist_name}</Text>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+    );
   };
 
   const renderSearchResult = ({ item }: { item: SearchResult }) => (
@@ -269,6 +337,7 @@ export default function SearchScreenAdv() {
             data={searchResults}
             renderItem={renderSearchResult}
             keyExtractor={(item) => item.videoId}
+            ListHeaderComponent={renderRelatedArtists}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons
@@ -388,6 +457,43 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 260,
+  },
+  // Related Artists Styles
+  relatedArtistsContainer: {
+    marginBottom: 16,
+    paddingTop: 12,
+  },
+  relatedArtistsTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  artistCard: {
+    backgroundColor: "#1e1e1e",
+    borderRadius: 8,
+    padding: 12,
+    alignItems: "center",
+    marginHorizontal: 5,
+    width: 120,
+  },
+  artistImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 8,
+  },
+  artistPlaceholder: {
+    backgroundColor: "#333",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  artistName: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
+    textAlign: "center",
   },
   // Search History Styles
   historyContainer: {
