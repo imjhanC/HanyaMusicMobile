@@ -9,12 +9,15 @@ import {
     KeyboardAvoidingView,
     Platform,
     SafeAreaView,
-    ActivityIndicator
+    ActivityIndicator,
+    Image
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
+import DocumentPicker from "react-native-document-picker";
 
 export default function RegAccScreen() {
+    const [profileImage, setProfileImage] = useState<string | null>(null);
     const [username, setUsername] = useState("");
     const [displayName, setDisplayName] = useState("");
     const [email, setEmail] = useState("");
@@ -25,24 +28,37 @@ export default function RegAccScreen() {
     const [focusedInput, setFocusedInput] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
-    // 👀 Password visibility
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const navigation = useNavigation();
 
-    // ✅ Email validation
-    const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    const validateEmail = (email: string) =>
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-    // ✅ Password rules
     const getPasswordValidation = (password: string) => ({
         length: password.length >= 8,
         capital: /[A-Z]/.test(password),
         number: /[0-9]/.test(password),
-        special: /[^A-Za-z0-9]/.test(password),
+        special: /[^A-Za-z0-9]/.test(password)
     });
 
     const passwordChecks = getPasswordValidation(password);
+
+    const pickImage = async () => {
+        try {
+            const res = await DocumentPicker.pickSingle({
+                type: [DocumentPicker.types.images] // JPG, PNG, GIF
+            });
+            setProfileImage(res.uri);
+        } catch (err: any) {
+            if (DocumentPicker.isCancel(err)) {
+                console.log("User canceled image selection");
+            } else {
+                console.error(err);
+            }
+        }
+    };
 
     const handleRegister = () => {
         let newErrors: any = {};
@@ -50,25 +66,16 @@ export default function RegAccScreen() {
         if (!username) newErrors.username = "Username required";
         if (!displayName) newErrors.displayName = "Display name required";
 
-        if (!email) {
-            newErrors.email = "Email required";
-        } else if (!validateEmail(email)) {
-            newErrors.email = "Invalid email format";
-        }
+        if (!email) newErrors.email = "Email required";
+        else if (!validateEmail(email)) newErrors.email = "Invalid email format";
 
-        if (!password) {
-            newErrors.password = "Password required";
-        } else {
-            if (!Object.values(getPasswordValidation(password)).every(Boolean)) {
-                newErrors.password = "Password does not meet requirements";
-            }
-        }
+        if (!password) newErrors.password = "Password required";
+        else if (!Object.values(getPasswordValidation(password)).every(Boolean))
+            newErrors.password = "Password does not meet requirements";
 
-        if (!confirmPassword) {
-            newErrors.confirmPassword = "Confirm your password";
-        } else if (password !== confirmPassword) {
+        if (!confirmPassword) newErrors.confirmPassword = "Confirm your password";
+        else if (password !== confirmPassword)
             newErrors.confirmPassword = "Passwords do not match";
-        }
 
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) return;
@@ -87,9 +94,7 @@ export default function RegAccScreen() {
                 size={16}
                 color={valid ? "#1DB954" : "#555"}
             />
-            <Text style={[styles.ruleText, valid && styles.ruleValid]}>
-                {text}
-            </Text>
+            <Text style={[styles.ruleText, valid && styles.ruleValid]}>{text}</Text>
         </View>
     );
 
@@ -111,7 +116,6 @@ export default function RegAccScreen() {
         return (
             <View style={{ marginBottom: 18 }}>
                 <Text style={styles.label}>{label}</Text>
-
                 <View
                     style={[
                         styles.inputContainer,
@@ -124,7 +128,6 @@ export default function RegAccScreen() {
                         size={20}
                         color={error ? "#FF4D4D" : isFocused ? "#1DB954" : "#777"}
                     />
-
                     <TextInput
                         style={styles.input}
                         placeholder={placeholder}
@@ -138,8 +141,6 @@ export default function RegAccScreen() {
                             setErrors((prev: any) => ({ ...prev, [name]: null }));
                         }}
                     />
-
-                    {/* Eye icon */}
                     {toggleSecure && (
                         <TouchableOpacity onPress={() => setIsVisible(!isVisible)}>
                             <Ionicons
@@ -150,7 +151,6 @@ export default function RegAccScreen() {
                         </TouchableOpacity>
                     )}
                 </View>
-
                 {error && <Text style={styles.error}>{error}</Text>}
             </View>
         );
@@ -177,6 +177,36 @@ export default function RegAccScreen() {
                             <Text style={styles.music}>Music</Text>
                         </View>
                         <Text style={styles.subtitle}>Your music, your way</Text>
+                    </View>
+
+                    {/* IMAGE PICKER */}
+                    <View style={{ alignItems: "center", marginBottom: 20 }}>
+                        {profileImage ? (
+                            // ✅ Fix: wrap in View with overflow hidden so GIFs are clipped correctly
+                            <View style={styles.avatarWrapper}>
+                                <Image
+                                    source={{ uri: profileImage }}
+                                    style={styles.avatarImage}
+                                    resizeMode="cover"
+                                    accessible={true}
+                                />
+                            </View>
+                        ) : (
+                            <View style={styles.avatarPlaceholder}>
+                                <Ionicons name="image-outline" size={40} color="#777" />
+                            </View>
+                        )}
+                        <TouchableOpacity
+                            style={styles.uploadButton}
+                            onPress={pickImage}
+                        >
+                            <Text style={styles.uploadButtonText}>
+                                Upload Image
+                            </Text>
+                        </TouchableOpacity>
+                        <Text style={styles.uploadHint}>
+                            Supports PNG, JPG, GIF
+                        </Text>
                     </View>
 
                     {/* FORM */}
@@ -227,7 +257,7 @@ export default function RegAccScreen() {
                             setIsVisible: setShowPassword
                         })}
 
-                        {/* 🔥 PASSWORD RULES */}
+                        {/* PASSWORD RULES */}
                         <View style={styles.passwordRules}>
                             <Rule text="At least 8 characters" valid={passwordChecks.length} />
                             <Rule text="One capital letter" valid={passwordChecks.capital} />
@@ -269,6 +299,7 @@ export default function RegAccScreen() {
 }
 
 const styles = StyleSheet.create({
+    // Layout & Container
     safeArea: {
         flex: 1,
         backgroundColor: "#0A0A0A"
@@ -280,6 +311,8 @@ const styles = StyleSheet.create({
         alignItems: "flex-end",
         marginBottom: 10
     },
+
+    // Header
     header: {
         alignItems: "center",
         marginBottom: 30
@@ -299,6 +332,43 @@ const styles = StyleSheet.create({
         color: "#777",
         marginTop: 6
     },
+
+    // Avatar
+    avatarWrapper: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        overflow: "hidden", // ✅ Key fix for GIF clipping
+    },
+    avatarImage: {
+        width: 100,
+        height: 100,
+    },
+    avatarPlaceholder: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: "#333",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    uploadButton: {
+        marginTop: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        backgroundColor: "#1DB954",
+        borderRadius: 8
+    },
+    uploadButtonText: {
+        color: "#000",
+        fontWeight: "700"
+    },
+    uploadHint: {
+        color: "#777",
+        marginTop: 4
+    },
+
+    // Card
     card: {
         backgroundColor: "#121212",
         borderRadius: 20,
@@ -310,6 +380,8 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         marginBottom: 20
     },
+
+    // Form Elements
     label: {
         color: "#aaa",
         marginBottom: 6
@@ -340,6 +412,8 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 4
     },
+
+    // Password Rules
     passwordRules: {
         marginTop: -10,
         marginBottom: 10
@@ -357,6 +431,8 @@ const styles = StyleSheet.create({
     ruleValid: {
         color: "#1DB954"
     },
+
+    // Button
     button: {
         backgroundColor: "#1DB954",
         padding: 16,
