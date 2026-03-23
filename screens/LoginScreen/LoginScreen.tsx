@@ -1,244 +1,280 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ActivityIndicator
+} from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const navigation = useNavigation();
+  
+  const [errors, setErrors] = useState<any>({});
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const navigation = useNavigation<any>();
 
   const handleLogin = () => {
-    console.log("Login pressed", email, password);
+    let newErrors: any = {};
+
+    if (!email) newErrors.email = "Email/Username required";
+    if (!password) newErrors.password = "Password required";
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      console.log("LOGIN SUCCESS");
+      navigation.navigate("HomeDrawer");
+    }, 1500);
   };
 
-  const handleClose = () => {
-    navigation.goBack();
-  };
+  const renderInput = ({
+    label,
+    icon,
+    value,
+    onChangeText,
+    placeholder,
+    secureTextEntry = false,
+    name,
+    error
+  }: any) => {
+    const isFocused = focusedInput === name;
 
-  const handleForgotPassword = () => {
-    console.log("Forgot password pressed");
-  };
+    return (
+      <View style={{ marginBottom: 18 }}>
+        <Text style={styles.label}>{label}</Text>
 
-  const handleCreateAccount = () => {
-    console.log("Create account pressed");
-  };
+        <View
+          style={[
+            styles.inputContainer,
+            isFocused && styles.inputFocused,
+            error && styles.inputError
+          ]}
+        >
+          <Ionicons
+            name={icon}
+            size={20}
+            color={error ? "#FF4D4D" : isFocused ? "#1DB954" : "#777"}
+          />
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
+          <TextInput
+            style={styles.input}
+            placeholder={placeholder}
+            placeholderTextColor="#666"
+            value={value}
+            secureTextEntry={secureTextEntry}
+            onFocus={() => setFocusedInput(name)}
+            onBlur={() => setFocusedInput(null)}
+            onChangeText={(text) => {
+              onChangeText(text);
+              setErrors((prev: any) => ({ ...prev, [name]: null }));
+            }}
+          />
+        </View>
+
+        {error && <Text style={styles.error}>{error}</Text>}
+      </View>
+    );
   };
 
   return (
-    <View style={styles.container}>
-      {/* Close Button */}
-      <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-        <Ionicons name="close" size={28} color="#fff" />
-      </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView contentContainerStyle={styles.container}>
 
-      {/* HanyaMusic Text */}
-      <View style={styles.textContainer}>
-        <View style={styles.textWrapper}>
-          <Text style={styles.hanyaText}>Hanya</Text>
-          <Text style={styles.kipasText}>Music</Text>
-        </View>
-        
-        {/* Subtitle */}
-        <Text style={styles.subtitle}>
-          Your music, your way
-        </Text>
-      </View>
+          {/* CLOSE BUTTON */}
+          <View style={styles.closeContainer}>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+          </View>
 
-      <Text style={styles.title}>Welcome Back !</Text>
- 
-      {/* Email Input */}
-      <View style={styles.inputWrapper}>
-        <Text style={styles.label}>Email</Text>
-        <View style={styles.inputContainer}>
-          <TextInput
-            placeholder="Enter your email / username ..."
-            placeholderTextColor="#555"
-            style={[styles.input, { fontSize: 16 }]}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-        </View>
-      </View>
+          {/* LOGO */}
+          <View style={styles.header}>
+            <View style={{ flexDirection: "row" }}>
+              <Text style={styles.hanya}>Hanya</Text>
+              <Text style={styles.music}>Music</Text>
+            </View>
+            <Text style={styles.subtitle}>Your music, your way</Text>
+          </View>
 
-      {/* Password Input */}
-      <View style={styles.inputWrapper}>
-        <Text style={styles.label}>Password</Text>
-        <View style={styles.inputContainer}>
-          <TextInput
-            placeholder="Enter your password ..."
-            placeholderTextColor="#555"
-            style={[styles.input, { fontSize: 16 }]}
-            secureTextEntry={!showPassword}
-            value={password}
-            onChangeText={setPassword}
-          />
-          <TouchableOpacity 
-            style={styles.eyeIcon}
-            onPress={togglePasswordVisibility}
-          >
-            <Ionicons 
-              name={showPassword ? "eye-off" : "eye"} 
-              size={20} 
-              color="#888" 
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
+          {/* FORM */}
+          <View style={styles.card}>
+            <Text style={styles.title}>Welcome Back</Text>
 
-      {/* Login Button */}
-      <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-        <Text style={styles.loginText}>Login</Text>
-      </TouchableOpacity>
+            {renderInput({
+              label: "Email or Username",
+              icon: "person-outline",
+              value: email,
+              onChangeText: setEmail,
+              placeholder: "Enter email or username",
+              name: "email",
+              error: errors.email
+            })}
 
-      {/* Forgot Password Link */}
-      <TouchableOpacity onPress={handleForgotPassword} style={styles.linkContainer}>
-        <Text style={styles.linkText}>Forgot password?</Text>
-      </TouchableOpacity>
+            {renderInput({
+              label: "Password",
+              icon: "lock-closed-outline",
+              value: password,
+              onChangeText: setPassword,
+              placeholder: "Enter password",
+              secureTextEntry: true,
+              name: "password",
+              error: errors.password
+            })}
 
-      {/* Create Account Link */}
-      <View style={styles.createAccountContainer}>
-        <Text style={styles.normalText}>Don't have an account? </Text>
-        <TouchableOpacity onPress={handleCreateAccount}>
-          <Text style={styles.createAccountText}>Create an Account</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+            <TouchableOpacity style={styles.forgotPassword}>
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            {/* BUTTON */}
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#000" />
+              ) : (
+                <Text style={styles.buttonText}>Login</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* CREATE ACCOUNT LINK */}
+            <View style={styles.footerContainer}>
+              <Text style={styles.footerText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate("RegAccScreen")}>
+                <Text style={styles.createAccountText}>Sign Up</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: "#121212",
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    backgroundColor: "#0A0A0A"
+  },
+  container: {
+    padding: 24,
     justifyContent: "center",
   },
-  closeButton: {
-    position: "absolute",
-    top: 50,
-    right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
+  closeContainer: {
+    alignItems: "flex-end",
+    marginBottom: 20
+  },
+  header: {
     alignItems: "center",
-    zIndex: 1,
+    marginBottom: 40
   },
-  textContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 40,
+  hanya: {
+    fontSize: 40,
+    color: "#fff",
+    fontWeight: "300"
   },
-  textWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  hanyaText: {
-    fontSize: 48,
-    fontWeight: '300',
-    color: '#fff',
-    letterSpacing: 2,
-  },
-  kipasText: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#1DB954',
-    letterSpacing: 2,
-    marginLeft: 8,
+  music: {
+    fontSize: 40,
+    color: "#1DB954",
+    fontWeight: "800",
+    marginLeft: 6
   },
   subtitle: {
-    fontSize: 16,
-    color: '#888',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
+    color: "#777",
+    marginTop: 6
+  },
+  card: {
+    backgroundColor: "#121212",
+    borderRadius: 20,
+    padding: 24
   },
   title: {
     color: "#fff",
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 32,
-    textAlign: "center",
-  },
-  inputWrapper: {
-    marginBottom: 20,
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 20
   },
   label: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
-    marginLeft: 4,
+    color: "#aaa",
+    marginBottom: 6
   },
   inputContainer: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#2a2a2a",
-    paddingHorizontal: 16,
-    paddingVertical: 4,
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#1A1A1A",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "#222"
+  },
+  inputFocused: {
+    borderColor: "#1DB954"
+  },
+  inputError: {
+    borderColor: "#FF4D4D"
   },
   input: {
-    color: "#fff",
-    fontSize: 16,
-    paddingVertical: 12,
     flex: 1,
-  },
-  eyeIcon: {
-    padding: 8,
-  },
-  loginButton: {
-    backgroundColor: "#1DB954",
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 12,
-    shadowColor: "#1DB954",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-    alignSelf: "center",
-    width: "100%",
-  },
-  loginText: {
     color: "#fff",
-    textAlign: "center",
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 1,
+    paddingVertical: 14,
+    marginLeft: 10
   },
-  linkContainer: {
-    alignItems: "center",
-    marginTop: 20,
+  error: {
+    color: "#FF4D4D",
+    fontSize: 12,
+    marginTop: 4
   },
-  linkText: {
+  forgotPassword: {
+    alignItems: "flex-end",
+    marginBottom: 20
+  },
+  forgotPasswordText: {
     color: "#1DB954",
     fontSize: 14,
     fontWeight: "600",
   },
-  createAccountContainer: {
+  button: {
+    backgroundColor: "#1DB954",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center"
+  },
+  buttonText: {
+    color: "#000",
+    fontWeight: "700",
+    fontSize: 16
+  },
+  footerContainer: {
     flexDirection: "row",
     justifyContent: "center",
-    alignItems: "center",
-    marginTop: 12,
+    marginTop: 20
   },
-  normalText: {
+  footerText: {
     color: "#888",
-    fontSize: 14,
+    fontSize: 14
   },
   createAccountText: {
     color: "#1DB954",
     fontSize: 14,
-    fontWeight: "700",
-  },
+    fontWeight: "700"
+  }
 });

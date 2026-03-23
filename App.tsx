@@ -15,6 +15,7 @@ import NoInternetScreen from "./screens/NoInternetScreen";
 import SearchScreenAdv from "./screens/SearchScreen/SearchScreenAdv";
 import SplashScreen from './screens/SplashScreen';
 import LoginScreen from './screens/LoginScreen/LoginScreen';
+import RegAccScreen from './screens/LoginScreen/RegAccScreen';
 import TopGlobalArtists from './screens/HomeScreen/TopGlobalArtists';
 import TopGlobalSongs from './screens/HomeScreen/TopGlobalSongs';
 import TopCountrySongs from './screens/HomeScreen/TopCountrySongs';
@@ -123,6 +124,11 @@ function MainStack() {
       <Stack.Screen
         name="Login"
         component={LoginScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="RegAccScreen"
+        component={RegAccScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
