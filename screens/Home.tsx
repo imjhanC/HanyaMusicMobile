@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, ScrollView, Text, Image, ActivityIndicator } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
-// Env 
-// import { HANYAMUSIC_URL } from "@env";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
 import { useMusicPlayer } from "../services/MusicPlayer";
+import { ServiceManager } from "../services/ServiceManager";
 
 // For top Global Artists 
 interface Artist {
@@ -77,8 +76,6 @@ const SongCard = React.memo(({ song }: { song: Song }) => (
     </Text>
   </View>
 ));
-
-import { ServiceManager } from "../services/ServiceManager";
 
 const Home = () => {
   const [data, setData] = useState<HomeScreenResult>({

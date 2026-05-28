@@ -85,6 +85,8 @@ function CustomDrawerContent(props: any) {
   );
 }
 
+import MainSettingScreen from "../screens/SettingScreen/MainSettingScreen";
+
 export default function HomeSidebar() {
   return (
     <Drawer.Navigator
@@ -96,7 +98,7 @@ export default function HomeSidebar() {
     >
       <Drawer.Screen name="Main" component={BottomTabsWithPlayer} />
       <Drawer.Screen name="Account" component={BottomTabsWithPlayer} />
-      <Drawer.Screen name="Settings" component={BottomTabsWithPlayer} />
+      <Drawer.Screen name="Settings" component={MainSettingScreen} />
     </Drawer.Navigator>
   );
 }

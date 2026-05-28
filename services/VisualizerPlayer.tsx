@@ -1,8 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 
-const NUM_COLUMNS = 40;
+const NUM_COLUMNS = 20;
 const BLOCKS_PER_COLUMN = 13;
+const BLOCK_HEIGHT = 9;
+const BLOCK_GAP = 2;
+
+// Total pixel height of N blocks stacked
+const stackHeight = (n: number) => n * (BLOCK_HEIGHT + BLOCK_GAP);
 
 function getMaxBlocks(colIndex: number, numCols: number): number {
   const center = (numCols - 1) / 2;
@@ -18,25 +23,21 @@ function getBlockColor(blockLevel: number, maxBlocks: number): string {
   return '#007722';
 }
 
-function getDimColor(blockLevel: number, maxBlocks: number): string {
-  const ratio = blockLevel / maxBlocks;
-  if (ratio > 0.82) return '#002210';
-  if (ratio > 0.58) return '#001a0a';
-  if (ratio > 0.33) return '#001208';
-  return '#000e05';
-}
-
-// Peak dot per column: tracks the highest point and bounces down
+// ---------------------------------------------------------------------------
+// PeakDot — sits in an absoluteFill overlay, positioned via `bottom`
+// ---------------------------------------------------------------------------
 function PeakDot({
   columnAnim,
   maxBlocks,
-  BLOCK_HEIGHT,
-  BLOCK_GAP,
+  colLeft,
+  colWidth,
+  paddingBottom,
 }: {
   columnAnim: Animated.Value;
   maxBlocks: number;
-  BLOCK_HEIGHT: number;
-  BLOCK_GAP: number;
+  colLeft: number;
+  colWidth: number;
+  paddingBottom: number;   // screen's paddingBottom so we share the baseline
 }) {
   const peakAnim = useRef(new Animated.Value(0)).current;
   const peakRef = useRef(0);
@@ -46,85 +47,79 @@ function PeakDot({
   useEffect(() => {
     const id = columnAnim.addListener(({ value }) => {
       if (value >= peakRef.current) {
-        // New peak — snap the dot up immediately
         peakRef.current = value;
         if (bounceTimeoutRef.current) clearTimeout(bounceTimeoutRef.current);
         if (bounceAnimRef.current) bounceAnimRef.current.stop();
         peakAnim.setValue(value);
 
-        // After a short hold, start WinXP-style bouncy decay
         bounceTimeoutRef.current = setTimeout(() => {
           bounceAnimRef.current = Animated.spring(peakAnim, {
             toValue: 0,
             useNativeDriver: false,
-            speed: 1.8,        // slow fall
-            bounciness: 14,    // bouncy overshoot like WinXP
+            speed: 1.8,
+            bounciness: 20,
           });
-          bounceAnimRef.current.start(() => {
-            peakRef.current = 0;
-          });
+          bounceAnimRef.current.start(() => { peakRef.current = 0; });
         }, 320);
       }
     });
-
     return () => {
       columnAnim.removeListener(id);
       if (bounceTimeoutRef.current) clearTimeout(bounceTimeoutRef.current);
     };
   }, [columnAnim, peakAnim]);
 
-  // Convert block level → bottom offset in pixels
+  if (colWidth === 0) return null;
+
+  // `bottom` = paddingBottom + (peakLevel * perBlockPx)
+  // This mirrors exactly how the green blocks grow from the bottom of the screen container.
   const bottomOffset = peakAnim.interpolate({
     inputRange: [0, maxBlocks],
-    outputRange: [0, maxBlocks * (BLOCK_HEIGHT + BLOCK_GAP)],
+    outputRange: [
+      paddingBottom,                              // dot at rest = just above baseline
+      paddingBottom + stackHeight(maxBlocks),     // dot at peak = top of tallest possible column
+    ],
     extrapolate: 'clamp',
   });
 
   return (
     <Animated.View
-      style={[
-        styles.peakDot,
-        {
-          bottom: bottomOffset,
-          width: '100%',
-          height: BLOCK_HEIGHT,
-        },
-      ]}
+      style={{
+        position: 'absolute',
+        left: colLeft,
+        width: colWidth,
+        height: BLOCK_HEIGHT,
+        bottom: bottomOffset,
+        borderRadius: 1,
+        backgroundColor: '#f200ffff',
+        shadowColor: '#f200ffff',
+        shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 5,
+        shadowOpacity: 1,
+        zIndex: 100,
+      }}
     />
   );
 }
 
+// ---------------------------------------------------------------------------
 export default function VisualizerPlayer({ isPlaying }: { isPlaying: boolean }) {
-  const BLOCK_HEIGHT = 9;
-  const BLOCK_GAP = 4;
-
   const columnAnims = useRef(
     Array.from({ length: NUM_COLUMNS }, () => new Animated.Value(0))
   ).current;
 
-  // Reset peaks when paused
-  const peakAnims = useRef(
-    Array.from({ length: NUM_COLUMNS }, () => new Animated.Value(0))
-  ).current;
+  // x + width of each column, measured inside the screen View
+  const [colLayouts, setColLayouts] = useState<{ x: number; width: number }[]>(
+    Array.from({ length: NUM_COLUMNS }, () => ({ x: 0, width: 0 }))
+  );
+
+  const SCREEN_PADDING_BOTTOM = 10; // must match styles.screen.paddingBottom
 
   useEffect(() => {
     if (!isPlaying) {
-      // Smoothly drop all columns to 0 — visualizer goes blank
-      columnAnims.forEach((anim) => {
-        Animated.timing(anim, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: false,
-        }).start();
-      });
-      // Also drop all peak dots
-      peakAnims.forEach((anim) => {
-        Animated.timing(anim, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: false,
-        }).start();
-      });
+      columnAnims.forEach((anim) =>
+        Animated.timing(anim, { toValue: 0, duration: 400, useNativeDriver: false }).start()
+      );
       return;
     }
 
@@ -134,9 +129,7 @@ export default function VisualizerPlayer({ isPlaying }: { isPlaying: boolean }) 
       if (!isActive) return;
       const maxBlocks = getMaxBlocks(index, NUM_COLUMNS);
       const targetHeight =
-        Math.random() > 0.08
-          ? Math.floor(Math.random() * maxBlocks) + 1
-          : 0;
+        Math.random() > 0.08 ? Math.floor(Math.random() * maxBlocks) + 1 : 0;
 
       Animated.sequence([
         Animated.timing(columnAnims[index], {
@@ -149,31 +142,36 @@ export default function VisualizerPlayer({ isPlaying }: { isPlaying: boolean }) 
           duration: 100 + Math.random() * 160,
           useNativeDriver: false,
         }),
-      ]).start(() => {
-        if (isActive) animateColumn(index);
-      });
+      ]).start(() => { if (isActive) animateColumn(index); });
     };
 
     columnAnims.forEach((_, i) => animateColumn(i));
-
-    return () => {
-      isActive = false;
-    };
+    return () => { isActive = false; };
   }, [isPlaying]);
 
   return (
     <View style={styles.container}>
       <View style={styles.screen}>
+        {/* ── Green block columns ── */}
         {columnAnims.map((anim, colIndex) => {
           const maxBlocks = getMaxBlocks(colIndex, NUM_COLUMNS);
 
           return (
-            <View key={colIndex} style={[styles.column, { position: 'relative' }]}>
-              {/* Stacked blocks */}
+            <View
+              key={colIndex}
+              style={styles.column}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                setColLayouts((prev) => {
+                  const next = [...prev];
+                  next[colIndex] = { x, width };
+                  return next;
+                });
+              }}
+            >
               {Array.from({ length: maxBlocks }).map((_, blockIndex) => {
-                const blockLevel = maxBlocks - blockIndex;
+                const blockLevel = maxBlocks - blockIndex; // top block = maxBlocks, bottom = 1
                 const activeColor = getBlockColor(blockLevel, maxBlocks);
-                const dimColor = 'transparent';
                 const glowRadius = blockLevel / maxBlocks > 0.82 ? 6 : 3;
                 const glowOpacity = blockLevel / maxBlocks > 0.58 ? 0.9 : 0.6;
 
@@ -185,7 +183,7 @@ export default function VisualizerPlayer({ isPlaying }: { isPlaying: boolean }) 
                       {
                         backgroundColor: anim.interpolate({
                           inputRange: [blockLevel - 1, blockLevel],
-                          outputRange: [dimColor, activeColor],
+                          outputRange: ['transparent', activeColor],
                           extrapolate: 'clamp',
                         }),
                         shadowColor: activeColor,
@@ -206,19 +204,25 @@ export default function VisualizerPlayer({ isPlaying }: { isPlaying: boolean }) 
                   />
                 );
               })}
-
-              {/* Bouncing peak dot — absolutely positioned */}
-              {isPlaying && (
-                <PeakDot
-                  columnAnim={anim}
-                  maxBlocks={maxBlocks}
-                  BLOCK_HEIGHT={BLOCK_HEIGHT}
-                  BLOCK_GAP={BLOCK_GAP}
-                />
-              )}
             </View>
           );
         })}
+
+        {/* ── Peak-dot overlay — rendered last so it's always on top ── */}
+        {isPlaying && (
+          <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+            {columnAnims.map((anim, colIndex) => (
+              <PeakDot
+                key={colIndex}
+                columnAnim={anim}
+                maxBlocks={getMaxBlocks(colIndex, NUM_COLUMNS)}
+                colLeft={colLayouts[colIndex].x}
+                colWidth={colLayouts[colIndex].width}
+                paddingBottom={SCREEN_PADDING_BOTTOM}
+              />
+            ))}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -240,7 +244,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#020802',
     paddingHorizontal: 10,
-    paddingBottom: 10,
+    paddingBottom: 10,   // ← must stay in sync with SCREEN_PADDING_BOTTOM
     paddingTop: 6,
     borderRadius: 6,
     overflow: 'hidden',
@@ -253,18 +257,8 @@ const styles = StyleSheet.create({
   },
   block: {
     width: '100%',
-    height: 9,
-    marginBottom: 2,
+    height: BLOCK_HEIGHT,
+    marginBottom: BLOCK_GAP,
     borderRadius: 1,
   },
-  peakDot: {
-    position: 'absolute',
-    borderRadius: 1,
-    backgroundColor: '#00ff88',
-    // Bright glow for the peak dot
-    shadowColor: '#00ff88',
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 5,
-    shadowOpacity: 1,
-  },
-}); 
+});

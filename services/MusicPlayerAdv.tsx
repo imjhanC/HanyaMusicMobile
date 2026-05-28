@@ -788,8 +788,9 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 16,
+    marginLeft: 7,
     alignSelf: "flex-end",
+    marginBottom: 6,
   },
 
   // Mode pill
@@ -867,7 +868,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: -0.2,
     marginBottom: 1,
-    marginRight: 20,
+    marginRight: 30,
     lineHeight: 25,
   },
   trackArtist: {
