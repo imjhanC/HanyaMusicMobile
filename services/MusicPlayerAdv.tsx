@@ -25,6 +25,7 @@ import TrackPlayer, {
 import { useMusicPlayer, MarqueeTitle } from "./MusicPlayer";
 import VideoPlayer from "./VideoPlayer";
 import { ServiceManager } from "./ServiceManager";
+import VisualizerPlayer from "./VisualizerPlayer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ export interface MVData {
 }
 
 type RepeatMode = "off" | "once" | "track";
+export type DisplayMode = "audio" | "video" | "visualizer";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -84,6 +86,8 @@ export default function MusicPlayerAdv() {
   const [isShuffle, setIsShuffle] = useState(false);
   const [titleContainerWidth, setTitleContainerWidth] = useState(0);
   const [isTitleOverflowing, setIsTitleOverflowing] = useState(true);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("audio");
+  const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
 
   // ── Video state ───────────────────────────────────────────────────────────
   const [mvData, setMvData] = useState<MVData | null>(null);
@@ -108,7 +112,8 @@ export default function MusicPlayerAdv() {
   useEffect(() => { videoPausedRef.current = videoPaused; }, [videoPaused]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const isVideoMode = mvData !== null;
+  const isVideoMode = displayMode === "video";
+  const isVisualizerMode = displayMode === "visualizer";
   const isAudioPlaying = playbackState?.state === State.Playing && !isTransitioning;
 
   const activePos = isVideoMode
@@ -135,6 +140,8 @@ export default function MusicPlayerAdv() {
 
   // ── Reset on track change ─────────────────────────────────────────────────
   useEffect(() => {
+    setDisplayMode("audio");
+    setIsModeDropdownOpen(false);
     setMvData(null);
     setIsVideoReady(false);
     setVideoPaused(true);
@@ -212,8 +219,17 @@ export default function MusicPlayerAdv() {
   }, [repeatMode, setRepeatMode]);
 
   // ── Video: switch to / from MV ────────────────────────────────────────────
-  const handleVideoSwitch = useCallback(async () => {
-    if (isVideoMode) {
+  const handleModeChange = useCallback(async (newMode: DisplayMode) => {
+    if (newMode === displayMode) {
+      setIsModeDropdownOpen(false);
+      return;
+    }
+
+    const prevMode = displayMode;
+    setDisplayMode(newMode);
+    setIsModeDropdownOpen(false);
+
+    if (prevMode === "video") {
       // ── Restore audio ────────────────────────────────────────────────────
       const snapPos = videoPosition;
       const savedUrl = originalAudioUrlRef.current;
@@ -245,69 +261,73 @@ export default function MusicPlayerAdv() {
           try { await TrackPlayer.play(); } catch (_) { }
         }
       }
-      return;
+
+      if (newMode === "visualizer") return;
     }
 
-    // ── Fetch MV ─────────────────────────────────────────────────────────
-    const songTitle = currentTrack?.title || currentTrack?.song_name || "";
-    const artist = currentTrack?.uploader || currentTrack?.artist_name || "";
+    if (newMode === "video") {
+      // ── Fetch MV ─────────────────────────────────────────────────────────
+      const songTitle = currentTrack?.title || currentTrack?.song_name || "";
+      const artist = currentTrack?.uploader || currentTrack?.artist_name || "";
 
-    if (!songTitle) {
-      setMVError("No song title — cannot search for MV.");
-      return;
+      if (!songTitle) {
+        setMVError("No song title — cannot search for MV.");
+        return;
+      }
+
+      setIsMVLoading(true);
+      setMVError(null);
+      setIsVideoReady(false);
+      setVideoBuffering(false);
+
+      try {
+        const baseUrl = await ServiceManager.getHanyaMusicUrl();
+        const reqUrl =
+          `${baseUrl}/search/exactwithMVMobile` +
+          `?song_title=${encodeURIComponent(songTitle)}` +
+          `&artist=${encodeURIComponent(artist)}`;
+
+        console.log("[MV] Fetching:", reqUrl);
+        const res = await fetch(reqUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const ct = res.headers.get("content-type") ?? "";
+        if (!ct.includes("application/json")) throw new Error("MV API returned non-JSON");
+
+        const data: MVData = await res.json();
+        if (!data.stream_url) throw new Error("Response missing stream_url");
+
+        console.log("[MV] stream_url:", data.stream_url, "| quality:", data.quality, "| cached:", data.cached);
+
+        // Snapshot audio before handing off to video
+        const snapPos = position;
+        originalAudioUrlRef.current = currentTrack?.audio_url || currentTrack?.url || "";
+        originalTrackMetaRef.current = {
+          title: currentTrack?.title || currentTrack?.song_name || "",
+          artist: currentTrack?.uploader || currentTrack?.artist_name || "",
+          artwork: currentTrack?.thumbnail_url || currentTrack?.thumbnail || "",
+          snapPos,
+        };
+
+        // Pause TrackPlayer — stream_url carries video + audio
+        try { await TrackPlayer.pause(); } catch (_) { }
+
+        setVideoDuration(data.duration || 0);
+        setVideoPosition(snapPos);
+        setVideoKey((k) => k + 1);
+        setMvData(data);
+        setVideoPlaying(false); // autoplay triggered by onLoad
+      } catch (e: any) {
+        console.error("[MV] error:", e?.message ?? e);
+        setMVError("Couldn't load MV: " + (e?.message ?? "unknown error"));
+        setDisplayMode("audio");
+        setVideoPlaying(false);
+        try { await TrackPlayer.play(); } catch (_) { }
+      } finally {
+        setIsMVLoading(false);
+      }
     }
-
-    setIsMVLoading(true);
-    setMVError(null);
-    setIsVideoReady(false);
-    setVideoBuffering(false);
-
-    try {
-      const baseUrl = await ServiceManager.getHanyaMusicUrl();
-      const reqUrl =
-        `${baseUrl}/search/exactwithMVMobile` +
-        `?song_title=${encodeURIComponent(songTitle)}` +
-        `&artist=${encodeURIComponent(artist)}`;
-
-      console.log("[MV] Fetching:", reqUrl);
-      const res = await fetch(reqUrl);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const ct = res.headers.get("content-type") ?? "";
-      if (!ct.includes("application/json")) throw new Error("MV API returned non-JSON");
-
-      const data: MVData = await res.json();
-      if (!data.stream_url) throw new Error("Response missing stream_url");
-
-      console.log("[MV] stream_url:", data.stream_url, "| quality:", data.quality, "| cached:", data.cached);
-
-      // Snapshot audio before handing off to video
-      const snapPos = position;
-      originalAudioUrlRef.current = currentTrack?.audio_url || currentTrack?.url || "";
-      originalTrackMetaRef.current = {
-        title: currentTrack?.title || currentTrack?.song_name || "",
-        artist: currentTrack?.uploader || currentTrack?.artist_name || "",
-        artwork: currentTrack?.thumbnail_url || currentTrack?.thumbnail || "",
-        snapPos,
-      };
-
-      // Pause TrackPlayer — stream_url carries video + audio
-      try { await TrackPlayer.pause(); } catch (_) { }
-
-      setVideoDuration(data.duration || 0);
-      setVideoPosition(snapPos);
-      setVideoKey((k) => k + 1);
-      setMvData(data);
-      setVideoPlaying(false); // autoplay triggered by onLoad
-    } catch (e: any) {
-      console.error("[MV] error:", e?.message ?? e);
-      setMVError("Couldn't load MV: " + (e?.message ?? "unknown error"));
-      setVideoPlaying(false);
-      try { await TrackPlayer.play(); } catch (_) { }
-    } finally {
-      setIsMVLoading(false);
-    }
-  }, [isVideoMode, currentTrack, position, setVideoPlaying, videoPosition]);
+  }, [displayMode, currentTrack, position, setVideoPlaying, videoPosition]);
 
   // ── Video callbacks ───────────────────────────────────────────────────────
   const handleVideoLoad = useCallback((meta: any) => {
@@ -403,7 +423,7 @@ export default function MusicPlayerAdv() {
 
         <View style={styles.content}>
 
-          {/* ── Artwork / Video ─────────────────────────────────────────── */}
+          {/* ── Artwork / Video / Visualizer ─────────────────────────────── */}
           {isVideoMode && mvData ? (
             <View style={styles.videoWrapper}>
               <Video
@@ -449,6 +469,10 @@ export default function MusicPlayerAdv() {
                 <Ionicons name="expand" size={18} color="#fff" />
               </TouchableOpacity>
             </View>
+          ) : isVisualizerMode ? (
+            <View style={styles.videoWrapper}>
+              <VisualizerPlayer isPlaying={isAudioPlaying} />
+            </View>
           ) : (
             <Image
               source={{ uri: currentTrack.thumbnail_url || currentTrack.thumbnail }}
@@ -464,30 +488,51 @@ export default function MusicPlayerAdv() {
                 setTitleContainerWidth(e.nativeEvent.layout.width)
               }
             >
-              {/* Video / Audio mode pill */}
-              <TouchableOpacity
-                style={[styles.modePill, isVideoMode && styles.modePillActive]}
-                activeOpacity={0.7}
-                onPress={handleVideoSwitch}
-                disabled={isMVLoading}
-              >
-                {isMVLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons
-                    name={isVideoMode ? "musical-notes" : "videocam"}
-                    size={13}
-                    color="#fff"
-                  />
+              {/* Video / Audio / Visualizer mode pill (dropdown) */}
+              <View style={{ zIndex: 100 }}>
+                <TouchableOpacity
+                  style={[styles.modePill, isVideoMode && styles.modePillActive, isVisualizerMode && styles.modePillVisActive]}
+                  activeOpacity={0.7}
+                  onPress={() => setIsModeDropdownOpen(!isModeDropdownOpen)}
+                  disabled={isMVLoading}
+                >
+                  {isMVLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons
+                      name={isVideoMode ? "videocam" : isVisualizerMode ? "pulse" : "musical-notes"}
+                      size={13}
+                      color="#fff"
+                    />
+                  )}
+                  <Text style={styles.modePillText}>
+                    {isMVLoading
+                      ? "Loading…"
+                      : displayMode === "video"
+                        ? "Video"
+                        : displayMode === "visualizer"
+                          ? "Visualizer"
+                          : "Audio"}{" "}▼
+                  </Text>
+                </TouchableOpacity>
+
+                {isModeDropdownOpen && (
+                  <View style={styles.dropdownMenu}>
+                    <TouchableOpacity style={styles.dropdownItem} onPress={() => handleModeChange("audio")}>
+                      <Ionicons name="musical-notes" size={14} color="#ccc" style={styles.dropdownIcon} />
+                      <Text style={styles.dropdownItemText}>Audio</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.dropdownItem} onPress={() => handleModeChange("video")}>
+                      <Ionicons name="videocam" size={14} color="#ccc" style={styles.dropdownIcon} />
+                      <Text style={styles.dropdownItemText}>Video</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.dropdownItem} onPress={() => handleModeChange("visualizer")}>
+                      <Ionicons name="pulse" size={14} color="#ccc" style={styles.dropdownIcon} />
+                      <Text style={styles.dropdownItemText}>Visualizer</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
-                <Text style={styles.modePillText}>
-                  {isMVLoading
-                    ? "Loading…"
-                    : isVideoMode
-                      ? "Switch to audio"
-                      : "Switch to video"}
-                </Text>
-              </TouchableOpacity>
+              </View>
 
               {mvError && <Text style={styles.errorText}>{mvError}</Text>}
 
@@ -730,6 +775,8 @@ const styles = StyleSheet.create({
     width: "90%",
     marginTop: 16,
     minHeight: 80,
+    zIndex: 100,
+    elevation: 100,
   },
   infoLeft: {
     flex: 1,
@@ -771,6 +818,41 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  modePillVisActive: {
+    backgroundColor: "rgba(39, 82, 232, 0.15)",
+    borderColor: "#2752e8",
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 38,
+    left: 0,
+    backgroundColor: 'rgb(25, 25, 25)',
+    borderRadius: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgb(255, 255, 255)',
+    minWidth: 130,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 100,
+    zIndex: 100,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  dropdownIcon: {
+    marginRight: 8,
+  },
+  dropdownItemText: {
+    color: '#e0e0e0',
+    fontSize: 13,
+    fontWeight: '600',
   },
   errorText: {
     color: "#ff6b6b",
