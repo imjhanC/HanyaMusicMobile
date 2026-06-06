@@ -19,9 +19,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSharedValue } from 'react-native-reanimated';
 import { ServiceManager } from "../../services/ServiceManager";
 
-// ENV import 
-// import { HANYAMUSIC_URL } from "@env";
-
 const SEARCH_HISTORY_KEY = '@search_history';
 const MAX_HISTORY_ITEMS = 10;
 

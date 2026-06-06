@@ -5,6 +5,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useMusicPlayer } from '../../services/MusicPlayer';
 import { State, usePlaybackState } from 'react-native-track-player';
 
+// Mini Visualizer effect icon while a song is playing 
 const MiniVisualizer = ({ isPlaying }: { isPlaying: boolean }) => {
     const animation1 = useRef(new Animated.Value(0)).current;
     const animation2 = useRef(new Animated.Value(0)).current;

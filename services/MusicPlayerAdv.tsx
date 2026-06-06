@@ -108,6 +108,7 @@ export default function MusicPlayerAdv() {
   const pendingSeekRef = useRef<number | null>(null);
   const isSeekingRef = useRef(false);
   const videoPausedRef = useRef(true);
+  const videoPositionRef = useRef(0);
 
   useEffect(() => { videoPausedRef.current = videoPaused; }, [videoPaused]);
 
@@ -149,6 +150,7 @@ export default function MusicPlayerAdv() {
     setMVError(null);
     setIsFullscreen(false);
     setVideoPosition(0);
+    videoPositionRef.current = 0;
     setVideoDuration(0);
     originalAudioUrlRef.current = null;
     originalTrackMetaRef.current = null;
@@ -173,6 +175,7 @@ export default function MusicPlayerAdv() {
         if (videoRef.current && isVideoReady) {
           videoRef.current.seek(target);
           setVideoPosition(target);
+          videoPositionRef.current = target;
         }
       } else {
         await TrackPlayer.seekTo(target);
@@ -231,9 +234,7 @@ export default function MusicPlayerAdv() {
 
     if (prevMode === "video") {
       // ── Restore audio ────────────────────────────────────────────────────
-      const snapPos = videoPosition;
-      const savedUrl = originalAudioUrlRef.current;
-      const savedMeta = originalTrackMetaRef.current;
+      const snapPos = videoPositionRef.current;
 
       setMvData(null);
       setIsVideoReady(false);
@@ -242,24 +243,15 @@ export default function MusicPlayerAdv() {
       setIsFullscreen(false);
       setVideoBuffering(false);
       setVideoPosition(0);
+      videoPositionRef.current = 0;
       setVideoDuration(0);
 
-      if (savedUrl && savedMeta) {
-        try {
-          await TrackPlayer.reset();
-          await TrackPlayer.add({
-            url: savedUrl,
-            title: savedMeta.title,
-            artist: savedMeta.artist,
-            artwork: savedMeta.artwork,
-          });
-          await new Promise((r) => setTimeout(r, 150));
-          await TrackPlayer.seekTo(snapPos);
-          await TrackPlayer.play();
-        } catch (e: any) {
-          console.error("[MV] restore audio error:", e?.message ?? e);
-          try { await TrackPlayer.play(); } catch (_) { }
-        }
+      try {
+        await TrackPlayer.seekTo(snapPos);
+        await TrackPlayer.play();
+      } catch (e: any) {
+        console.error("[MV] restore audio error:", e?.message ?? e);
+        try { await TrackPlayer.play(); } catch (_) { }
       }
 
       if (newMode === "visualizer") return;
@@ -314,6 +306,7 @@ export default function MusicPlayerAdv() {
 
         setVideoDuration(data.duration || 0);
         setVideoPosition(snapPos);
+        videoPositionRef.current = snapPos;
         setVideoKey((k) => k + 1);
         setMvData(data);
         setVideoPlaying(false); // autoplay triggered by onLoad
@@ -336,13 +329,16 @@ export default function MusicPlayerAdv() {
     setVideoBuffering(false);
     if (meta?.duration) setVideoDuration(meta.duration);
 
-    const snapPos = originalTrackMetaRef.current?.snapPos ?? 0;
+    const snapPos = videoPositionRef.current;
     if (videoRef.current && snapPos > 0) videoRef.current.seek(snapPos);
     setTimeout(() => setVideoPlaying(true), VIDEO_AUTOPLAY_DELAY_MS);
   }, [setVideoPlaying]);
 
   const handleVideoProgress = useCallback(({ currentTime }: { currentTime: number }) => {
-    if (!isSeekingRef.current) setVideoPosition(currentTime);
+    if (!isSeekingRef.current) {
+      setVideoPosition(currentTime);
+      videoPositionRef.current = currentTime;
+    }
   }, []);
 
   const handleVideoBuffer = useCallback(({ isBuffering }: { isBuffering: boolean }) => {
@@ -361,12 +357,16 @@ export default function MusicPlayerAdv() {
 
   const handleVideoSeekComplete = useCallback(({ currentTime }: { currentTime: number }) => {
     console.log("[Video] Seek completed:", currentTime);
-    if (!isSeekingRef.current) setVideoPosition(currentTime);
+    if (!isSeekingRef.current) {
+      setVideoPosition(currentTime);
+      videoPositionRef.current = currentTime;
+    }
   }, []);
 
   // ── Fullscreen sync ───────────────────────────────────────────────────────
   const handleFullscreenClose = useCallback((pos: number, dur: number) => {
     setVideoPosition(pos);
+    videoPositionRef.current = pos;
     if (dur > 0) setVideoDuration(dur);
     setIsFullscreen(false);
   }, []);
@@ -375,6 +375,7 @@ export default function MusicPlayerAdv() {
     isSeekingRef.current = true;
     pendingSeekRef.current = t;
     setVideoPosition(t);
+    videoPositionRef.current = t;
     videoRef.current?.seek(t);
     setTimeout(() => {
       pendingSeekRef.current = null;

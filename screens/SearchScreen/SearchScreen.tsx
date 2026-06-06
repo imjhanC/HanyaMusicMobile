@@ -11,7 +11,6 @@ const SearchScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   const handleSearchPress = () => {
-    // Navigate directly to SearchAdv
     navigation.navigate("SearchAdv");
   };
 

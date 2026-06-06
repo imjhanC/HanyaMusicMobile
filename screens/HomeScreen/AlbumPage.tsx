@@ -7,6 +7,7 @@ const AlbumPage = ({ route, navigation }: any) => {
     const { artistName, albums } = route.params;
     const insets = useSafeAreaInsets();
 
+    // Sort Artist's song by date 
     const allReleases = Object.keys(albums).map(albumName => {
         const firstSong = albums[albumName][0];
         const dateValue = new Date(firstSong.release_date).getTime() || firstSong.release_year;

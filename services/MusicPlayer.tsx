@@ -9,12 +9,6 @@ import TrackPlayer, {
   useProgress,
   RepeatMode,
 } from "react-native-track-player";
-
-// ENV import 
-// import { HANYAMUSIC_URL } from "@env"; // No longer using static env URL
-
-
-// Service Manager
 import { ServiceManager } from "./ServiceManager";
 
 // Context

@@ -11,27 +11,26 @@ export default function MainSettingScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={28} color="#fff" />
+          <Ionicons name="arrow-back" size={26} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Settings</Text>
-        <View style={{ width: 28 }} />
       </View>
 
       {/* Settings Content */}
       <View style={styles.content}>
         <View style={styles.settingItem}>
           <Text style={styles.settingText}>Notifications</Text>
-          <Switch value={true} onValueChange={() => {}} />
+          <Switch value={true} onValueChange={() => { }} />
         </View>
 
         <View style={styles.settingItem}>
           <Text style={styles.settingText}>Dark Mode</Text>
-          <Switch value={true} onValueChange={() => {}} />
+          <Switch value={true} onValueChange={() => { }} />
         </View>
 
         <View style={styles.settingItem}>
           <Text style={styles.settingText}>Data Saver</Text>
-          <Switch value={false} onValueChange={() => {}} />
+          <Switch value={false} onValueChange={() => { }} />
         </View>
 
         <TouchableOpacity style={styles.actionButton}>
@@ -54,19 +53,25 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 20,
+    paddingTop: 45,
+    paddingBottom: 15,
     backgroundColor: '#1e1e1e',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
   },
   backButton: {
-    padding: 4,
+    padding: 8,
+    marginLeft: -8,
+    marginTop: 7,
   },
   headerTitle: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 31,
     fontWeight: 'bold',
+    marginLeft: 30,
+    marginTop: 7,
   },
   content: {
     padding: 20,

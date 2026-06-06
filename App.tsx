@@ -23,8 +23,6 @@ import ArtistPage from './screens/HomeScreen/ArtistPage';
 import AlbumPage from './screens/HomeScreen/AlbumPage';
 import ArtistAlbumSongs from './screens/HomeScreen/ArtistAlbumSongs';
 
-//import CreateAccScreen from './screens/LoginScreen/CreateAccScreen';
-
 // Music Player
 import { GlobalMusicPlayer, MusicPlayerProvider } from "./services/MusicPlayer";
 import MusicPlayerAdv from "./services/MusicPlayerAdv";
@@ -93,8 +91,8 @@ export function BottomTabs() {
       }}
     >
       <Tab.Screen name="Home" component={HomeStackNavigator} options={{ headerTitle: "" }} />
-      <Tab.Screen name="Playlist" component={Playlist} />
-      <Tab.Screen name="Search" component={SearchScreen} options={{ headerTitleAlign: "left", headerTitleStyle: { fontSize: 35, fontWeight: "bold", marginLeft: 30, marginTop: 7 } }} />
+      <Tab.Screen name="Playlist" component={Playlist} options={{ headerTitleAlign: "left", headerTitleStyle: { fontSize: 31, fontWeight: "bold", marginLeft: 30, marginTop: 7 } }} />
+      <Tab.Screen name="Search" component={SearchScreen} options={{ headerTitleAlign: "left", headerTitleStyle: { fontSize: 31, fontWeight: "bold", marginLeft: 30, marginTop: 7 } }} />
     </Tab.Navigator>
   );
 }
