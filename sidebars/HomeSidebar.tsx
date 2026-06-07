@@ -13,15 +13,16 @@ import {
   DrawerItem,
   useDrawerProgress,
 } from "@react-navigation/drawer";
-import { useNavigation } from "@react-navigation/native"; // Import useNavigation
+import { useNavigation } from "@react-navigation/native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { BottomTabs } from "../App";
 import { GlobalMusicPlayer } from "../services/MusicPlayer";
+import { useAuth } from "../services/Auth/AuthProvider";
+import MainSettingScreen from "../screens/SettingScreen/MainSettingScreen";
 
 const Drawer = createDrawerNavigator();
 const { width } = Dimensions.get("window");
 
-// Wrapper for BottomTabs that includes the MusicPlayer
 function BottomTabsWithPlayer() {
   const drawerProgress = useDrawerProgress();
   return (
@@ -33,21 +34,42 @@ function BottomTabsWithPlayer() {
 }
 
 function CustomDrawerContent(props: any) {
-  const navigation = useNavigation(); // Move useNavigation inside the component
+  const { isAuthenticated, user, logout } = useAuth();
+
+  const handleAuthAction = async () => {
+    props.navigation.closeDrawer();
+    if (isAuthenticated) {
+      await logout();
+    } else {
+      props.navigation.navigate("Login");
+    }
+  };
 
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
-      {/* Profile Section */}
       <View style={styles.profileSection}>
-        <Image
-          source={{ uri: "https://i.pinimg.com/736x/4b/f3/b8/4bf3b84b3662652a68d7c9d47ad2ab4c.jpg" }}
-          style={styles.avatar}
-        />
-        <Text style={styles.username}>Karina</Text>
-        <Text style={styles.email}>karina@sm.com</Text>
+        {/* Frame with clipping - ensures image stays inside circle */}
+        <View style={styles.avatarFrame}>
+          {isAuthenticated && user?.avatar_url ? (
+            <Image
+              source={{ uri: user.avatar_url }}
+              style={styles.avatarImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Ionicons name="person-outline" size={50} color="#777" />
+            </View>
+          )}
+        </View>
+        <Text style={styles.username}>
+          {isAuthenticated && user ? (user.display_name || user.username) : "Guest"}
+        </Text>
+        <Text style={styles.email}>
+          {isAuthenticated && user ? user.email : "Not logged in"}
+        </Text>
       </View>
 
-      {/* Menu Items */}
       <View style={styles.menuSection}>
         <DrawerItem
           label="Menu"
@@ -70,22 +92,20 @@ function CustomDrawerContent(props: any) {
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.logoutButton} 
-          onPress={() => {
-              props.navigation.closeDrawer();
-              props.navigation.navigate("Login");
-            }}
-          >
-          <Ionicons name="log-in-outline" size={22} color="#fff" />
-          <Text style={styles.logoutText}>Login</Text>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleAuthAction}>
+          <Ionicons
+            name={isAuthenticated ? "log-out-outline" : "log-in-outline"}
+            size={22}
+            color={isAuthenticated ? "#FF4D4D" : "#fff"}
+          />
+          <Text style={[styles.logoutText, isAuthenticated && { color: "#FF4D4D" }]}>
+            {isAuthenticated ? "Logout" : "Login"}
+          </Text>
         </TouchableOpacity>
       </View>
     </DrawerContentScrollView>
   );
 }
-
-import MainSettingScreen from "../screens/SettingScreen/MainSettingScreen";
 
 export default function HomeSidebar() {
   return (
@@ -110,18 +130,44 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#333",
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 30,
-    marginBottom: 10,
-    borderWidth: 2,
-    borderColor: "#fff",
+  // Outer decorative frame – now with overflow hidden to clip the image
+  avatarFrame: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    overflow: "hidden", // <-- CRITICAL: clips the inner image to the circle
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+    // Outer glow
+    shadowColor: "#FFD700",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+    // Gold border
+    borderWidth: 2.5,
+    borderColor: "#FFD700",
+    backgroundColor: "#333", // fallback background
+  },
+  // The actual image – fills the entire frame
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  // Placeholder when no avatar
+  avatarPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#333",
+    justifyContent: "center",
+    alignItems: "center",
   },
   username: {
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
+    marginTop: 8,
   },
   email: {
     color: "#aaa",

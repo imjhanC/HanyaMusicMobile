@@ -102,8 +102,6 @@ const Home = () => {
       // Providers and multi-service geolocation strategy
       const fetchGeoInfo = async () => {
         const providers = [
-          { url: 'https://ipapi.co/json/', code: 'country_code', name: 'country_name' },
-          { url: 'https://freeipapi.com/api/json', code: 'countryCode', name: 'countryName' },
           { url: 'http://ip-api.com/json', code: 'countryCode', name: 'country' }
         ];
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, TouchableOpacity, StyleSheet } from "react-native";
+import { View, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { NavigationContainer, getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -30,6 +30,11 @@ import MusicPlayerAdv from "./services/MusicPlayerAdv";
 // Sidebar
 import HomeSidebar from "./sidebars/HomeSidebar";
 
+// Auth
+import { AuthProvider, useAuth } from "./services/Auth/AuthProvider";
+import { LoginStateManager } from "./services/Auth/LoginStateManager";
+
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -39,9 +44,21 @@ const RETRY_TIMEOUT = 1000;
 
 // Custom header with user icon
 function CustomHeader({ navigation }: any) {
+  const { isAuthenticated, user } = useAuth();
+
   return (
     <TouchableOpacity style={styles.headerButton} onPress={() => navigation.openDrawer()}>
-      <Ionicons name="person-circle-outline" size={45} color="#fff" />
+      {isAuthenticated && user?.avatar_url ? (
+        <View style={{ width: 42, height: 42, borderRadius: 19, overflow: "hidden", borderWidth: 1.5, borderColor: '#000000ff' }}>
+          <Image
+            source={{ uri: user.avatar_url }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+          />
+        </View>
+      ) : (
+        <Ionicons name="person-circle-outline" size={45} color="#fff" />
+      )}
     </TouchableOpacity>
   );
 }
@@ -210,12 +227,16 @@ export default function App() {
 
   return (
     <MusicPlayerProvider>
-      <NavigationContainer>
-        <View style={{ flex: 1 }}>
-          <MainStack />
-          <MusicPlayerAdv />
-        </View>
-      </NavigationContainer>
+      <AuthProvider>
+        <LoginStateManager>
+          <NavigationContainer>
+            <View style={{ flex: 1 }}>
+              <MainStack />
+              <MusicPlayerAdv />
+            </View>
+          </NavigationContainer>
+        </LoginStateManager>
+      </AuthProvider>
     </MusicPlayerProvider>
   );
 }

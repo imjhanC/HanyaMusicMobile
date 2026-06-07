@@ -15,6 +15,8 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import DocumentPicker from "react-native-document-picker";
+import AuthApi from "../../services/Auth/AuthApi";
+import { useAuth } from "../../services/Auth/AuthProvider";
 
 export default function RegAccScreen() {
     const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -31,7 +33,8 @@ export default function RegAccScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    const navigation = useNavigation();
+    const navigation = useNavigation<any>();
+    const { login } = useAuth();
 
     const validateEmail = (email: string) =>
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -60,7 +63,7 @@ export default function RegAccScreen() {
         }
     };
 
-    const handleRegister = () => {
+    const handleRegister = async () => {
         let newErrors: any = {};
 
         if (!username) newErrors.username = "Username required";
@@ -81,10 +84,51 @@ export default function RegAccScreen() {
         if (Object.keys(newErrors).length > 0) return;
 
         setLoading(true);
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            const formData = new FormData();
+            formData.append('username', username);
+            formData.append('email', email);
+            formData.append('password', password);
+            formData.append('display_name', displayName);
+
+            if (profileImage) {
+                // Determine the type from the extension, or default to image/jpeg
+                const fileType = profileImage.toLowerCase().endsWith('png') ? 'image/png' 
+                             : profileImage.toLowerCase().endsWith('gif') ? 'image/gif' 
+                             : 'image/jpeg';
+                             
+                formData.append('avatar', {
+                    uri: profileImage,
+                    name: `avatar_${Date.now()}.${fileType.split('/')[1]}`,
+                    type: fileType,
+                } as any);
+            }
+
+            const response = await AuthApi.post('/auth/register', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+
+            const { access_token, refresh_token } = response.data;
+            
+            // Log the user in automatically after successful registration
+            await login(access_token, refresh_token);
+            
             console.log("REGISTER SUCCESS");
-        }, 1500);
+            navigation.navigate("HomeDrawer");
+        } catch (error: any) {
+            console.log("REGISTER FAILED", error);
+            // Fast API typically returns details in error.response.data.detail
+            const detail = error.response?.data?.detail;
+            if (typeof detail === 'string') {
+                setErrors({ email: detail }); // Show generic error under email
+            } else {
+                setErrors({ email: "Registration failed. Please try again." });
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     const Rule = ({ text, valid }: any) => (

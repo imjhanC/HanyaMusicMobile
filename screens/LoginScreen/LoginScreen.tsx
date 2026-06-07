@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
+import { useAuth } from "../../services/Auth/AuthProvider";
+import AuthApi from "../../services/Auth/AuthApi";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -24,7 +26,9 @@ export default function LoginScreen() {
 
   const navigation = useNavigation<any>();
 
-  const handleLogin = () => {
+  const { login } = useAuth();
+
+  const handleLogin = async () => {
     let newErrors: any = {};
 
     if (!email) newErrors.email = "Email/Username required";
@@ -34,11 +38,31 @@ export default function LoginScreen() {
     if (Object.keys(newErrors).length > 0) return;
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // Create x-www-form-urlencoded data since FastAPI OAuth2PasswordRequestForm expects it by default
+      const formData = new URLSearchParams();
+      formData.append('username', email);
+      formData.append('password', password);
+
+      const response = await AuthApi.post('/auth/token', formData.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+      
+      const { access_token, refresh_token } = response.data;
+      
+      await login(access_token, refresh_token);
+      
       console.log("LOGIN SUCCESS");
       navigation.navigate("HomeDrawer");
-    }, 1500);
+    } catch (error: any) {
+      console.log("LOGIN FAILED", error);
+      // We can inspect error.response.data.detail for FastAPI's default error messages
+      setErrors({ email: "Invalid credentials" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderInput = ({
