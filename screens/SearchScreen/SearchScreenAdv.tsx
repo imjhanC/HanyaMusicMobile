@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   StatusBar,
   Platform,
+  Modal,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -18,6 +20,7 @@ import { useMusicPlayer, GlobalMusicPlayer } from "../../services/MusicPlayer";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSharedValue } from 'react-native-reanimated';
 import { ServiceManager } from "../../services/ServiceManager";
+import { PlaylistApi, PlaylistResponse } from "../../services/PlaylistApi";
 
 const SEARCH_HISTORY_KEY = '@search_history';
 const MAX_HISTORY_ITEMS = 10;
@@ -43,6 +46,11 @@ export default function SearchScreenAdv() {
   const [relatedArtists, setRelatedArtists] = useState<RelatedArtist[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [savedVideoIds, setSavedVideoIds] = useState<Set<string>>(new Set());
+  const [isPlaylistModalVisible, setPlaylistModalVisible] = useState(false);
+  const [userPlaylists, setUserPlaylists] = useState<PlaylistResponse[]>([]);
+  const [isPlaylistsLoading, setIsPlaylistsLoading] = useState(false);
+  const [trackToAdd, setTrackToAdd] = useState<SearchResult | null>(null);
   const navigation = useNavigation();
   const { playTrack, setCurrentScreen } = useMusicPlayer() as { playTrack: (track: SearchResult) => void; setCurrentScreen: (screen: string | null) => void };
   const drawerProgress = useSharedValue(0);
@@ -58,7 +66,28 @@ export default function SearchScreenAdv() {
   // Load search history on mount
   useEffect(() => {
     loadSearchHistory();
+    fetchSavedTracks();
   }, []);
+
+  const fetchSavedTracks = async () => {
+    try {
+      const playlists = await PlaylistApi.getMyPlaylists();
+      const allVideoIds = new Set<string>();
+      await Promise.all(
+        playlists.map(async (playlist) => {
+          try {
+            const tracks = await PlaylistApi.getTracks(playlist.id);
+            tracks.forEach(t => allVideoIds.add(t.video_id));
+          } catch (err) {
+            console.error("Failed to fetch tracks for playlist", playlist.id, err);
+          }
+        })
+      );
+      setSavedVideoIds(allVideoIds);
+    } catch (e) {
+      console.error("Failed to fetch saved tracks:", e);
+    }
+  };
 
   // Load search history from AsyncStorage
   const loadSearchHistory = async () => {
@@ -228,6 +257,68 @@ export default function SearchScreenAdv() {
     );
   };
 
+  const handleOpenAddToPlaylist = async (track: SearchResult) => {
+    setTrackToAdd(track);
+    setPlaylistModalVisible(true);
+    setIsPlaylistsLoading(true);
+    try {
+      const playlists = await PlaylistApi.getMyPlaylists();
+      setUserPlaylists(playlists);
+    } catch (e) {
+      console.error("Failed to load playlists", e);
+      Alert.alert("Error", "Could not load playlists. Please ensure you are logged in.");
+    } finally {
+      setIsPlaylistsLoading(false);
+    }
+  };
+
+  const handleAddToPlaylist = async (playlistId: number) => {
+    if (!trackToAdd) return;
+    try {
+      let finalImageUrl = trackToAdd.thumbnail_url || null;
+      if (finalImageUrl && finalImageUrl.startsWith("http")) {
+        try {
+          const res = await fetch(finalImageUrl);
+          const blob = await res.blob();
+          finalImageUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (fetchErr) {
+          console.error("Error fetching/encoding image:", fetchErr);
+        }
+      }
+
+      let durationSeconds = 0;
+      if (trackToAdd.duration) {
+          const parts = trackToAdd.duration.split(':').reverse();
+          let seconds = 0;
+          for (let i = 0; i < parts.length; i++) {
+              seconds += parseInt(parts[i]) * Math.pow(60, i);
+          }
+          durationSeconds = seconds;
+      }
+
+      const trackAddObj = {
+        video_id: trackToAdd.videoId,
+        title: trackToAdd.title,
+        artist: trackToAdd.uploader,
+        image_url: finalImageUrl || undefined,
+        duration_seconds: durationSeconds || undefined
+      };
+
+      await PlaylistApi.addTrack(playlistId, trackAddObj);
+      Alert.alert("Success", "Added to playlist!");
+      setPlaylistModalVisible(false);
+      setSavedVideoIds(prev => new Set(prev).add(trackToAdd.videoId));
+    } catch (e: any) {
+      console.error("Failed to add track to playlist", e);
+      Alert.alert("Error", e?.response?.data?.detail || "Could not add track to playlist.");
+    }
+  };
+
   const renderSearchResult = ({ item }: { item: SearchResult }) => (
     <TouchableOpacity style={styles.trackItem} onPress={() => playTrack(item)}>
       <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} />
@@ -239,6 +330,20 @@ export default function SearchScreenAdv() {
           {item.uploader} • {item.duration}
         </Text>
       </View>
+      <TouchableOpacity 
+        style={styles.addBtn}
+        onPress={() => {
+          if (!savedVideoIds.has(item.videoId)) {
+            handleOpenAddToPlaylist(item);
+          }
+        }}
+      >
+        <Ionicons 
+          name={savedVideoIds.has(item.videoId) ? "checkmark-circle" : "add-circle-outline"} 
+          size={28} 
+          color={savedVideoIds.has(item.videoId) ? "#1DB954" : "#fff"} 
+        />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -269,7 +374,7 @@ export default function SearchScreenAdv() {
 
   useFocusEffect(
     React.useCallback(() => {
-      return () => { };
+      fetchSavedTracks();
     }, [])
   );
 
@@ -371,6 +476,50 @@ export default function SearchScreenAdv() {
         )}
       </View>
       <GlobalMusicPlayer drawerProgress={drawerProgress} />
+
+      <Modal visible={isPlaylistModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add to Playlist</Text>
+              <TouchableOpacity onPress={() => setPlaylistModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            {isPlaylistsLoading ? (
+              <View style={styles.modalLoading}>
+                <ActivityIndicator size="large" color="#1DB954" />
+              </View>
+            ) : (
+              <FlatList
+                data={userPlaylists}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.playlistItem}
+                    onPress={() => handleAddToPlaylist(item.id)}
+                  >
+                    <Ionicons name="list-outline" size={24} color="#ccc" style={{ marginRight: 12 }} />
+                    <View>
+                      <Text style={styles.playlistItemName}>{item.name}</Text>
+                      {item.description ? (
+                        <Text style={styles.playlistItemDesc}>{item.description}</Text>
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  <Text style={styles.emptyPlaylistsText}>
+                    No playlists available. Please create one first!
+                  </Text>
+                }
+                style={styles.playlistList}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -431,8 +580,67 @@ const styles = StyleSheet.create({
     color: "#aaa",
     fontSize: 13,
   },
+  addBtn: {
+    padding: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   flatListContent: {
     paddingBottom: 140,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: "85%",
+    maxHeight: "70%",
+    backgroundColor: "#222",
+    borderRadius: 12,
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  modalLoading: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  playlistList: {
+    marginTop: 8,
+  },
+  playlistItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#333",
+  },
+  playlistItemName: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "500",
+  },
+  playlistItemDesc: {
+    fontSize: 12,
+    color: "#aaa",
+    marginTop: 2,
+  },
+  emptyPlaylistsText: {
+    color: "#aaa",
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 14,
   },
   emptyContainer: {
     flex: 1,

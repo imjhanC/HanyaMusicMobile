@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Home from "./screens/Home";
 import Playlist from "./screens/Playlist";
 import SearchScreen from "./screens/SearchScreen/SearchScreen";
+import PlaylistDetails from "./screens/PlaylistDetails";
 import NoInternetScreen from "./screens/NoInternetScreen";
 import SearchScreenAdv from "./screens/SearchScreen/SearchScreenAdv";
 import SplashScreen from './screens/SplashScreen';
@@ -38,6 +39,7 @@ import { LoginStateManager } from "./services/Auth/LoginStateManager";
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const HomeStack = createNativeStackNavigator();
+const PlaylistStack = createNativeStackNavigator();
 
 const SPLASH_SHOWN_KEY = '@splash_shown';
 const RETRY_TIMEOUT = 1000;
@@ -68,8 +70,8 @@ export function BottomTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route, navigation }) => {
-        const routeName = getFocusedRouteNameFromRoute(route) ?? "HomeMain";
-        const isHeaderHidden = ["TopGlobalArtists", "TopGlobalSongs", "TopCountrySongs", "ArtistPage", "AlbumPage", "ArtistAlbumSongs"].includes(routeName);
+        const routeName = getFocusedRouteNameFromRoute(route) ?? route.name;
+        const isHeaderHidden = ["TopGlobalArtists", "TopGlobalSongs", "TopCountrySongs", "ArtistPage", "AlbumPage", "ArtistAlbumSongs", "PlaylistDetails"].includes(routeName);
 
         return {
           headerShown: !isHeaderHidden,
@@ -108,7 +110,7 @@ export function BottomTabs() {
       }}
     >
       <Tab.Screen name="Home" component={HomeStackNavigator} options={{ headerTitle: "" }} />
-      <Tab.Screen name="Playlist" component={Playlist} options={{ headerTitleAlign: "left", headerTitleStyle: { fontSize: 31, fontWeight: "bold", marginLeft: 30, marginTop: 7 } }} />
+      <Tab.Screen name="Playlist" component={PlaylistStackNavigator} options={{ headerTitleAlign: "left", headerTitleStyle: { fontSize: 31, fontWeight: "bold", marginLeft: 30, marginTop: 7 } }} />
       <Tab.Screen name="Search" component={SearchScreen} options={{ headerTitleAlign: "left", headerTitleStyle: { fontSize: 31, fontWeight: "bold", marginLeft: 30, marginTop: 7 } }} />
     </Tab.Navigator>
   );
@@ -126,6 +128,16 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="AlbumPage" component={AlbumPage} />
       <HomeStack.Screen name="ArtistAlbumSongs" component={ArtistAlbumSongs} />
     </HomeStack.Navigator>
+  );
+}
+
+// Playlist nested stack
+function PlaylistStackNavigator() {
+  return (
+    <PlaylistStack.Navigator screenOptions={{ headerShown: false }}>
+      <PlaylistStack.Screen name="PlaylistMain" component={Playlist} />
+      <PlaylistStack.Screen name="PlaylistDetails" component={PlaylistDetails} />
+    </PlaylistStack.Navigator>
   );
 }
 

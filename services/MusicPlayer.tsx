@@ -366,8 +366,10 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
       if (streamData && streamData.stream_url) {
         await TrackPlayer.reset();
 
+        const resolvedVideoId = trackToPlay.videoId || streamData.id || String(Date.now());
+
         const trackConfig = {
-          id: trackToPlay.videoId || streamData.id || String(Date.now()), // Fallback ID
+          id: resolvedVideoId,
           url: streamData.stream_url,
           title: trackToPlay.title,
           artist: trackToPlay.uploader,
@@ -377,6 +379,14 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
         };
 
         await TrackPlayer.add(trackConfig);
+
+        setCurrentTrack((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            videoId: resolvedVideoId,
+          };
+        });
 
         if (hasCurrentTrack) {
           await fadeInNewTrack(800);

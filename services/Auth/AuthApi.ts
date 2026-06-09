@@ -11,9 +11,13 @@ const AuthApi = axios.create({
 // Add a request interceptor to attach the access token
 AuthApi.interceptors.request.use(
   async (config) => {
-    // Dynamically set the base URL before every request
     const baseUrl = await ServiceManager.getHanyaMusicUrl();
-    config.baseURL = baseUrl;
+    // Explicitly set the full URL to avoid Axios baseURL resolution issues
+    if (config.url && config.url.startsWith('/')) {
+        config.url = `${baseUrl}${config.url}`;
+    } else if (config.url && !config.url.startsWith('http')) {
+        config.url = `${baseUrl}/${config.url}`;
+    }
 
     const token = await AuthStorage.getAccessToken();
     if (token) {

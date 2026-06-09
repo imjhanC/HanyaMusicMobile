@@ -13,6 +13,9 @@ import {
   ActivityIndicator,
   LayoutChangeEvent,
   Dimensions,
+  Modal,
+  FlatList,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -26,6 +29,7 @@ import { useMusicPlayer, MarqueeTitle } from "./MusicPlayer";
 import VideoPlayer from "./VideoPlayer";
 import { ServiceManager } from "./ServiceManager";
 import VisualizerPlayer from "./VisualizerPlayer";
+import { PlaylistApi, PlaylistResponse, TrackAdd } from "./PlaylistApi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,6 +93,12 @@ export default function MusicPlayerAdv() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("audio");
   const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
 
+  // ── Playlist Modal State ──────────────────────────────────────────────────
+  const [isPlaylistModalVisible, setPlaylistModalVisible] = useState(false);
+  const [userPlaylists, setUserPlaylists] = useState<PlaylistResponse[]>([]);
+  const [isPlaylistsLoading, setIsPlaylistsLoading] = useState(false);
+  const [savedVideoIds, setSavedVideoIds] = useState<Set<string>>(new Set());
+
   // ── Video state ───────────────────────────────────────────────────────────
   const [mvData, setMvData] = useState<MVData | null>(null);
   const [isMVLoading, setIsMVLoading] = useState(false);
@@ -143,6 +153,7 @@ export default function MusicPlayerAdv() {
   useEffect(() => {
     setDisplayMode("audio");
     setIsModeDropdownOpen(false);
+    setPlaylistModalVisible(false);
     setMvData(null);
     setIsVideoReady(false);
     setVideoPaused(true);
@@ -383,6 +394,87 @@ export default function MusicPlayerAdv() {
     }, SEEK_SETTLE_MS);
   }, []);
 
+  const fetchSavedTracks = async () => {
+    try {
+      const playlists = await PlaylistApi.getMyPlaylists();
+      const allVideoIds = new Set<string>();
+      await Promise.all(
+        playlists.map(async (playlist) => {
+          try {
+            const tracks = await PlaylistApi.getTracks(playlist.id);
+            tracks.forEach(t => allVideoIds.add(t.video_id));
+          } catch (err) {
+            console.error("Failed to fetch tracks for playlist", playlist.id, err);
+          }
+        })
+      );
+      setSavedVideoIds(allVideoIds);
+    } catch (e) {
+      console.error("Failed to fetch saved tracks:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdvOpen) {
+      fetchSavedTracks();
+    }
+  }, [isAdvOpen, currentTrack?.videoId]);
+
+  // ── Playlist Functions ────────────────────────────────────────────────────
+  const handleOpenAddToPlaylist = async () => {
+    setPlaylistModalVisible(true);
+    setIsPlaylistsLoading(true);
+    try {
+      const playlists = await PlaylistApi.getMyPlaylists();
+      setUserPlaylists(playlists);
+    } catch (e) {
+      console.error("Failed to load playlists", e);
+      Alert.alert("Error", "Could not load playlists. Please ensure you are logged in.");
+    } finally {
+      setIsPlaylistsLoading(false);
+    }
+  };
+
+  const handleAddToPlaylist = async (playlistId: number) => {
+    if (!currentTrack) return;
+    try {
+      let finalImageUrl = currentTrack.thumbnail_url || currentTrack.thumbnail || null;
+      if (finalImageUrl && finalImageUrl.startsWith("http")) {
+        try {
+          const res = await fetch(finalImageUrl);
+          const blob = await res.blob();
+          finalImageUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (fetchErr) {
+          console.error("Error fetching/encoding image:", fetchErr);
+        }
+      }
+
+      const trackAdd: TrackAdd = {
+        video_id: currentTrack.videoId || String(Date.now()), // Fallback ID if missing
+        title: currentTrack.title || currentTrack.song_name || "Unknown",
+        artist: currentTrack.uploader || currentTrack.artist_name || null,
+        image_url: finalImageUrl,
+        duration_seconds: Math.floor(isVideoMode ? videoDuration : duration) || undefined
+      };
+
+      await PlaylistApi.addTrack(playlistId, trackAdd);
+      Alert.alert("Success", "Added to playlist!");
+      setPlaylistModalVisible(false);
+      const trackId = currentTrack.videoId || trackAdd.video_id;
+      if (trackId) {
+        setSavedVideoIds(prev => new Set(prev).add(trackId));
+      }
+    } catch (e: any) {
+      console.error("Failed to add track to playlist", e);
+      Alert.alert("Error", e?.response?.data?.detail || "Could not add track to playlist.");
+    }
+  };
+
   // ── Guard ─────────────────────────────────────────────────────────────────
   if (!isAdvOpen || !currentTrack) return null;
 
@@ -572,8 +664,17 @@ export default function MusicPlayerAdv() {
             <TouchableOpacity
               style={styles.addBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => {
+                if (currentTrack.videoId && !savedVideoIds.has(currentTrack.videoId)) {
+                  handleOpenAddToPlaylist();
+                }
+              }}
             >
-              <Ionicons name="add-circle-outline" size={30} color="#fff" />
+              <Ionicons
+                name={currentTrack.videoId && savedVideoIds.has(currentTrack.videoId) ? "checkmark-circle" : "add-circle-outline"}
+                size={30}
+                color={currentTrack.videoId && savedVideoIds.has(currentTrack.videoId) ? "#1DB954" : "#fff"}
+              />
             </TouchableOpacity>
           </View>
 
@@ -682,6 +783,52 @@ export default function MusicPlayerAdv() {
           </View>
 
         </View>
+
+        {/* ── Add to Playlist Modal ──────────────────────────────────────── */}
+        <Modal visible={isPlaylistModalVisible} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add to Playlist</Text>
+                <TouchableOpacity onPress={() => setPlaylistModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
+              {isPlaylistsLoading ? (
+                <View style={styles.modalLoading}>
+                  <ActivityIndicator size="large" color="#1DB954" />
+                </View>
+              ) : (
+                <FlatList
+                  data={userPlaylists}
+                  keyExtractor={(item) => item.id.toString()}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.playlistItem}
+                      onPress={() => handleAddToPlaylist(item.id)}
+                    >
+                      <Ionicons name="list-outline" size={24} color="#ccc" style={{ marginRight: 12 }} />
+                      <View>
+                        <Text style={styles.playlistItemName}>{item.name}</Text>
+                        {item.description ? (
+                          <Text style={styles.playlistItemDesc}>{item.description}</Text>
+                        ) : null}
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  ListEmptyComponent={
+                    <Text style={styles.emptyPlaylistsText}>
+                      No playlists available. Please create one first!
+                    </Text>
+                  }
+                  style={styles.playlistList}
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
+
       </SafeAreaView>
     </View>
   );
@@ -798,63 +945,103 @@ const styles = StyleSheet.create({
   modePill: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 16,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: 20,
-    marginBottom: 10,
+    marginBottom: 8,
     alignSelf: "flex-start",
-    borderWidth: 1,
-    borderColor: "transparent",
-    height: 32,
-    minWidth: 150,
   },
   modePillActive: {
-    backgroundColor: "rgba(29,185,84,0.15)",
-    borderColor: "#1DB954",
-  },
-  modePillText: {
-    color: "#e0e0e0",
-    fontSize: 10,
-    fontWeight: "700",
-    marginLeft: 5,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    backgroundColor: "rgba(255,255,255,0.25)",
   },
   modePillVisActive: {
-    backgroundColor: "rgba(39, 82, 232, 0.15)",
-    borderColor: "#2752e8",
+    backgroundColor: "rgba(29, 185, 84, 0.2)",
+  },
+  modePillText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    marginLeft: 6,
   },
   dropdownMenu: {
-    position: 'absolute',
-    top: 38,
+    position: "absolute",
+    top: 36,
     left: 0,
-    backgroundColor: 'rgb(25, 25, 25)',
+    backgroundColor: "#1e1e1e",
     borderRadius: 8,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: 'rgb(255, 255, 255)',
-    minWidth: 130,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 100,
-    zIndex: 100,
+    paddingVertical: 8,
+    width: 140,
+    elevation: 5,
   },
   dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
   },
   dropdownIcon: {
-    marginRight: 8,
+    marginRight: 10,
   },
   dropdownItemText: {
-    color: '#e0e0e0',
-    fontSize: 13,
-    fontWeight: '600',
+    color: "#ccc",
+    fontSize: 14,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: "85%",
+    maxHeight: "70%",
+    backgroundColor: "#222",
+    borderRadius: 12,
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  modalLoading: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  playlistList: {
+    marginTop: 8,
+  },
+  playlistItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#333",
+  },
+  playlistItemName: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "500",
+  },
+  playlistItemDesc: {
+    fontSize: 12,
+    color: "#aaa",
+    marginTop: 2,
+  },
+  emptyPlaylistsText: {
+    color: "#888",
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 14,
   },
   errorText: {
     color: "#ff6b6b",
