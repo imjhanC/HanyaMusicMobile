@@ -148,6 +148,9 @@ const Playlist = () => {
   };
 
   const handleLongPressPlaylist = (item: PlaylistResponse) => {
+    // Liked Songs cannot be edited or deleted
+    if (item.name === LIKED_SONGS_NAME) return;
+
     Alert.alert(
       "Playlist Options",
       `What would you like to do with "${item.name}"?`,

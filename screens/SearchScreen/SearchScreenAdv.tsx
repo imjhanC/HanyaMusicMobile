@@ -10,8 +10,6 @@ import {
   ActivityIndicator,
   StatusBar,
   Platform,
-  Modal,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -20,7 +18,7 @@ import { useMusicPlayer, GlobalMusicPlayer } from "../../services/MusicPlayer";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSharedValue } from 'react-native-reanimated';
 import { ServiceManager } from "../../services/ServiceManager";
-import { PlaylistApi, PlaylistResponse } from "../../services/PlaylistApi";
+import { PlaylistApi } from "../../services/PlaylistApi";
 
 const SEARCH_HISTORY_KEY = '@search_history';
 const MAX_HISTORY_ITEMS = 10;
@@ -47,10 +45,7 @@ export default function SearchScreenAdv() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [savedVideoIds, setSavedVideoIds] = useState<Set<string>>(new Set());
-  const [isPlaylistModalVisible, setPlaylistModalVisible] = useState(false);
-  const [userPlaylists, setUserPlaylists] = useState<PlaylistResponse[]>([]);
-  const [isPlaylistsLoading, setIsPlaylistsLoading] = useState(false);
-  const [trackToAdd, setTrackToAdd] = useState<SearchResult | null>(null);
+  const [likingId, setLikingId] = useState<string | null>(null); // videoId being processed
   const navigation = useNavigation();
   const { playTrack, setCurrentScreen } = useMusicPlayer() as { playTrack: (track: SearchResult) => void; setCurrentScreen: (screen: string | null) => void };
   const drawerProgress = useSharedValue(0);
@@ -257,95 +252,94 @@ export default function SearchScreenAdv() {
     );
   };
 
-  const handleOpenAddToPlaylist = async (track: SearchResult) => {
-    setTrackToAdd(track);
-    setPlaylistModalVisible(true);
-    setIsPlaylistsLoading(true);
+  // ── Like / Unlike directly in Liked Songs ──────────────────────────────────
+  const handleLikeToggle = async (track: SearchResult) => {
+    if (likingId === track.videoId) return; // already in-flight
+    setLikingId(track.videoId);
+
     try {
       const playlists = await PlaylistApi.getMyPlaylists();
-      setUserPlaylists(playlists);
-    } catch (e) {
-      console.error("Failed to load playlists", e);
-      Alert.alert("Error", "Could not load playlists. Please ensure you are logged in.");
-    } finally {
-      setIsPlaylistsLoading(false);
-    }
-  };
+      const likedPlaylist = playlists.find((p) => p.name === "Liked Songs");
+      if (!likedPlaylist) return;
 
-  const handleAddToPlaylist = async (playlistId: number) => {
-    if (!trackToAdd) return;
-    try {
-      let finalImageUrl = trackToAdd.thumbnail_url || null;
-      if (finalImageUrl && finalImageUrl.startsWith("http")) {
-        try {
-          const res = await fetch(finalImageUrl);
-          const blob = await res.blob();
-          finalImageUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
+      if (savedVideoIds.has(track.videoId)) {
+        // ── Remove from Liked Songs ──────────────────────────────────────────
+        const tracks = await PlaylistApi.getTracks(likedPlaylist.id);
+        const existing = tracks.find((t) => t.video_id === track.videoId);
+        if (existing) {
+          await PlaylistApi.removeTrack(likedPlaylist.id, existing.id);
+          setSavedVideoIds((prev) => {
+            const next = new Set(prev);
+            next.delete(track.videoId);
+            return next;
           });
-        } catch (fetchErr) {
-          console.error("Error fetching/encoding image:", fetchErr);
         }
-      }
-
-      let durationSeconds = 0;
-      if (trackToAdd.duration) {
-          const parts = trackToAdd.duration.split(':').reverse();
-          let seconds = 0;
+      } else {
+        // ── Add to Liked Songs ───────────────────────────────────────────────
+        // Parse duration string ("3:45" → 225)
+        let durationSeconds = 0;
+        if (track.duration) {
+          const parts = track.duration.split(':').reverse();
           for (let i = 0; i < parts.length; i++) {
-              seconds += parseInt(parts[i]) * Math.pow(60, i);
+            durationSeconds += parseInt(parts[i]) * Math.pow(60, i);
           }
-          durationSeconds = seconds;
+        }
+
+        await PlaylistApi.addTrack(likedPlaylist.id, {
+          video_id: track.videoId,
+          title: track.title,
+          artist: track.uploader,
+          image_url: track.thumbnail_url || undefined,
+          duration_seconds: durationSeconds || undefined,
+        });
+        setSavedVideoIds((prev) => new Set(prev).add(track.videoId));
       }
-
-      const trackAddObj = {
-        video_id: trackToAdd.videoId,
-        title: trackToAdd.title,
-        artist: trackToAdd.uploader,
-        image_url: finalImageUrl || undefined,
-        duration_seconds: durationSeconds || undefined
-      };
-
-      await PlaylistApi.addTrack(playlistId, trackAddObj);
-      Alert.alert("Success", "Added to playlist!");
-      setPlaylistModalVisible(false);
-      setSavedVideoIds(prev => new Set(prev).add(trackToAdd.videoId));
     } catch (e: any) {
-      console.error("Failed to add track to playlist", e);
-      Alert.alert("Error", e?.response?.data?.detail || "Could not add track to playlist.");
+      if (e?.response?.status !== 409) {
+        console.error("[LikeToggle] error:", e);
+      } else {
+        // 409 = already exists, mark as saved
+        setSavedVideoIds((prev) => new Set(prev).add(track.videoId));
+      }
+    } finally {
+      setLikingId(null);
     }
   };
 
-  const renderSearchResult = ({ item }: { item: SearchResult }) => (
-    <TouchableOpacity style={styles.trackItem} onPress={() => playTrack(item)}>
-      <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} />
-      <View style={styles.trackInfo}>
-        <Text style={styles.trackTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.trackMeta}>
-          {item.uploader} • {item.duration}
-        </Text>
-      </View>
-      <TouchableOpacity 
-        style={styles.addBtn}
-        onPress={() => {
-          if (!savedVideoIds.has(item.videoId)) {
-            handleOpenAddToPlaylist(item);
-          }
-        }}
-      >
-        <Ionicons 
-          name={savedVideoIds.has(item.videoId) ? "checkmark-circle" : "add-circle-outline"} 
-          size={28} 
-          color={savedVideoIds.has(item.videoId) ? "#1DB954" : "#fff"} 
-        />
+  const renderSearchResult = ({ item }: { item: SearchResult }) => {
+    const isSaved = savedVideoIds.has(item.videoId);
+    const isLiking = likingId === item.videoId;
+
+    return (
+      <TouchableOpacity style={styles.trackItem} onPress={() => playTrack(item)}>
+        <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} />
+        <View style={styles.trackInfo}>
+          <Text style={styles.trackTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={styles.trackMeta}>
+            {item.uploader} • {item.duration}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => handleLikeToggle(item)}
+          disabled={isLiking}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          {isLiking ? (
+            <ActivityIndicator size="small" color="#1DB954" />
+          ) : (
+            <Ionicons
+              name={isSaved ? "checkmark-circle" : "add-circle-outline"}
+              size={28}
+              color={isSaved ? "#1DB954" : "#fff"}
+            />
+          )}
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const renderHistoryItem = ({ item }: { item: string }) => (
     <TouchableOpacity
@@ -476,50 +470,6 @@ export default function SearchScreenAdv() {
         )}
       </View>
       <GlobalMusicPlayer drawerProgress={drawerProgress} />
-
-      <Modal visible={isPlaylistModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add to Playlist</Text>
-              <TouchableOpacity onPress={() => setPlaylistModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Ionicons name="close" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            {isPlaylistsLoading ? (
-              <View style={styles.modalLoading}>
-                <ActivityIndicator size="large" color="#1DB954" />
-              </View>
-            ) : (
-              <FlatList
-                data={userPlaylists}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.playlistItem}
-                    onPress={() => handleAddToPlaylist(item.id)}
-                  >
-                    <Ionicons name="list-outline" size={24} color="#ccc" style={{ marginRight: 12 }} />
-                    <View>
-                      <Text style={styles.playlistItemName}>{item.name}</Text>
-                      {item.description ? (
-                        <Text style={styles.playlistItemDesc}>{item.description}</Text>
-                      ) : null}
-                    </View>
-                  </TouchableOpacity>
-                )}
-                ListEmptyComponent={
-                  <Text style={styles.emptyPlaylistsText}>
-                    No playlists available. Please create one first!
-                  </Text>
-                }
-                style={styles.playlistList}
-              />
-            )}
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -588,60 +538,7 @@ const styles = StyleSheet.create({
   flatListContent: {
     paddingBottom: 140,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContainer: {
-    width: "85%",
-    maxHeight: "70%",
-    backgroundColor: "#222",
-    borderRadius: 12,
-    padding: 20,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  modalLoading: {
-    paddingVertical: 40,
-    alignItems: "center",
-  },
-  playlistList: {
-    marginTop: 8,
-  },
-  playlistItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#333",
-  },
-  playlistItemName: {
-    fontSize: 16,
-    color: "#fff",
-    fontWeight: "500",
-  },
-  playlistItemDesc: {
-    fontSize: 12,
-    color: "#aaa",
-    marginTop: 2,
-  },
-  emptyPlaylistsText: {
-    color: "#aaa",
-    textAlign: "center",
-    marginTop: 20,
-    fontSize: 14,
-  },
+
   emptyContainer: {
     flex: 1,
     alignItems: "center",

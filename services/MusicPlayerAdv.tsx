@@ -13,8 +13,6 @@ import {
   ActivityIndicator,
   LayoutChangeEvent,
   Dimensions,
-  Modal,
-  FlatList,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,6 +28,7 @@ import VideoPlayer from "./VideoPlayer";
 import { ServiceManager } from "./ServiceManager";
 import VisualizerPlayer from "./VisualizerPlayer";
 import { PlaylistApi, PlaylistResponse, TrackAdd } from "./PlaylistApi";
+import PlaylistModal from "../screens/PlaylistModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,6 +97,7 @@ export default function MusicPlayerAdv() {
   const [userPlaylists, setUserPlaylists] = useState<PlaylistResponse[]>([]);
   const [isPlaylistsLoading, setIsPlaylistsLoading] = useState(false);
   const [savedVideoIds, setSavedVideoIds] = useState<Set<string>>(new Set());
+  const [isLikedSongsLoading, setIsLikedSongsLoading] = useState(false);
 
   // ── Video state ───────────────────────────────────────────────────────────
   const [mvData, setMvData] = useState<MVData | null>(null);
@@ -415,30 +415,50 @@ export default function MusicPlayerAdv() {
   };
 
   useEffect(() => {
+    // Refresh saved-state whenever the track changes (covers ServiceManager
+    // session restore + autoplay transitions that happen while player is closed).
+    if (currentTrack?.videoId) {
+      fetchSavedTracks();
+    }
+  }, [currentTrack?.videoId]);
+
+  useEffect(() => {
+    // Also re-check when the user opens the advanced player so the icon
+    // is always in sync even if they added/removed from another screen.
     if (isAdvOpen) {
       fetchSavedTracks();
     }
-  }, [isAdvOpen, currentTrack?.videoId]);
+  }, [isAdvOpen]);
 
   // ── Playlist Functions ────────────────────────────────────────────────────
-  const handleOpenAddToPlaylist = async () => {
-    setPlaylistModalVisible(true);
-    setIsPlaylistsLoading(true);
+
+  /**
+   * Quick-like: adds the current track directly to the "Liked Songs" playlist.
+   * If it's already liked, open the full manage-playlist modal instead.
+   */
+  const handleLikeButton = async () => {
+    if (!currentTrack) return;
+    const videoId = currentTrack.videoId || "";
+    const alreadySaved = videoId ? savedVideoIds.has(videoId) : false;
+
+    if (alreadySaved) {
+      // Already liked → open the manage modal so user can add/remove across playlists
+      setPlaylistModalVisible(true);
+      return;
+    }
+
+    // Not yet liked → instantly add to "Liked Songs"
+    setIsLikedSongsLoading(true);
     try {
       const playlists = await PlaylistApi.getMyPlaylists();
-      setUserPlaylists(playlists);
-    } catch (e) {
-      console.error("Failed to load playlists", e);
-      Alert.alert("Error", "Could not load playlists. Please ensure you are logged in.");
-    } finally {
-      setIsPlaylistsLoading(false);
-    }
-  };
+      const likedPlaylist = playlists.find((p) => p.name === "Liked Songs");
+      if (!likedPlaylist) {
+        Alert.alert("Error", "Could not find your Liked Songs playlist.");
+        return;
+      }
 
-  const handleAddToPlaylist = async (playlistId: number) => {
-    if (!currentTrack) return;
-    try {
-      let finalImageUrl = currentTrack.thumbnail_url || currentTrack.thumbnail || null;
+      let finalImageUrl: string | undefined =
+        currentTrack.thumbnail_url || currentTrack.thumbnail || undefined;
       if (finalImageUrl && finalImageUrl.startsWith("http")) {
         try {
           const res = await fetch(finalImageUrl);
@@ -449,29 +469,31 @@ export default function MusicPlayerAdv() {
             reader.onerror = reject;
             reader.readAsDataURL(blob);
           });
-        } catch (fetchErr) {
-          console.error("Error fetching/encoding image:", fetchErr);
+        } catch {
+          // Keep original URL as fallback
         }
       }
 
       const trackAdd: TrackAdd = {
-        video_id: currentTrack.videoId || String(Date.now()), // Fallback ID if missing
+        video_id: videoId || String(Date.now()),
         title: currentTrack.title || currentTrack.song_name || "Unknown",
-        artist: currentTrack.uploader || currentTrack.artist_name || null,
+        artist: currentTrack.uploader || currentTrack.artist_name || undefined,
         image_url: finalImageUrl,
-        duration_seconds: Math.floor(isVideoMode ? videoDuration : duration) || undefined
+        duration_seconds: Math.floor(isVideoMode ? videoDuration : duration) || undefined,
       };
 
-      await PlaylistApi.addTrack(playlistId, trackAdd);
-      Alert.alert("Success", "Added to playlist!");
-      setPlaylistModalVisible(false);
-      const trackId = currentTrack.videoId || trackAdd.video_id;
-      if (trackId) {
-        setSavedVideoIds(prev => new Set(prev).add(trackId));
-      }
+      await PlaylistApi.addTrack(likedPlaylist.id, trackAdd);
+      if (videoId) setSavedVideoIds((prev) => new Set(prev).add(videoId));
     } catch (e: any) {
-      console.error("Failed to add track to playlist", e);
-      Alert.alert("Error", e?.response?.data?.detail || "Could not add track to playlist.");
+      if (e?.response?.status !== 409) {
+        console.error("Failed to like track", e);
+        Alert.alert("Error", e?.response?.data?.detail || "Could not add to Liked Songs.");
+      } else {
+        // Already in playlist — just mark it
+        if (videoId) setSavedVideoIds((prev) => new Set(prev).add(videoId));
+      }
+    } finally {
+      setIsLikedSongsLoading(false);
     }
   };
 
@@ -664,17 +686,26 @@ export default function MusicPlayerAdv() {
             <TouchableOpacity
               style={styles.addBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={() => {
-                if (currentTrack.videoId && !savedVideoIds.has(currentTrack.videoId)) {
-                  handleOpenAddToPlaylist();
-                }
-              }}
+              onPress={handleLikeButton}
+              disabled={isLikedSongsLoading}
             >
-              <Ionicons
-                name={currentTrack.videoId && savedVideoIds.has(currentTrack.videoId) ? "checkmark-circle" : "add-circle-outline"}
-                size={30}
-                color={currentTrack.videoId && savedVideoIds.has(currentTrack.videoId) ? "#1DB954" : "#fff"}
-              />
+              {isLikedSongsLoading ? (
+                <ActivityIndicator size="small" color="#1DB954" />
+              ) : (
+                <Ionicons
+                  name={
+                    currentTrack.videoId && savedVideoIds.has(currentTrack.videoId)
+                      ? "checkmark-circle"
+                      : "add-circle-outline"
+                  }
+                  size={28}
+                  color={
+                    currentTrack.videoId && savedVideoIds.has(currentTrack.videoId)
+                      ? "#1DB954"
+                      : "#fff"
+                  }
+                />
+              )}
             </TouchableOpacity>
           </View>
 
@@ -784,50 +815,17 @@ export default function MusicPlayerAdv() {
 
         </View>
 
-        {/* ── Add to Playlist Modal ──────────────────────────────────────── */}
-        <Modal visible={isPlaylistModalVisible} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Add to Playlist</Text>
-                <TouchableOpacity onPress={() => setPlaylistModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Ionicons name="close" size={24} color="#fff" />
-                </TouchableOpacity>
-              </View>
-
-              {isPlaylistsLoading ? (
-                <View style={styles.modalLoading}>
-                  <ActivityIndicator size="large" color="#1DB954" />
-                </View>
-              ) : (
-                <FlatList
-                  data={userPlaylists}
-                  keyExtractor={(item) => item.id.toString()}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.playlistItem}
-                      onPress={() => handleAddToPlaylist(item.id)}
-                    >
-                      <Ionicons name="list-outline" size={24} color="#ccc" style={{ marginRight: 12 }} />
-                      <View>
-                        <Text style={styles.playlistItemName}>{item.name}</Text>
-                        {item.description ? (
-                          <Text style={styles.playlistItemDesc}>{item.description}</Text>
-                        ) : null}
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                  ListEmptyComponent={
-                    <Text style={styles.emptyPlaylistsText}>
-                      No playlists available. Please create one first!
-                    </Text>
-                  }
-                  style={styles.playlistList}
-                />
-              )}
-            </View>
-          </View>
-        </Modal>
+        {/* ── Manage Playlists Modal (bottom sheet) ───────────────────────── */}
+        <PlaylistModal
+          visible={isPlaylistModalVisible}
+          onClose={() => {
+            setPlaylistModalVisible(false);
+            // Refresh savedVideoIds after user may have removed track from playlists
+            fetchSavedTracks();
+          }}
+          currentTrack={currentTrack}
+          duration={isVideoMode ? videoDuration : duration}
+        />
 
       </SafeAreaView>
     </View>
@@ -930,6 +928,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0, // critical: lets flex children shrink below their natural width
     alignItems: "flex-start",
+    overflow: "hidden", // clip the marquee animation at the container edge
   },
   addBtn: {
     width: 40,
@@ -988,66 +987,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContainer: {
-    width: "85%",
-    maxHeight: "70%",
-    backgroundColor: "#222",
-    borderRadius: 12,
-    padding: 20,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  modalLoading: {
-    paddingVertical: 40,
-    alignItems: "center",
-  },
-  playlistList: {
-    marginTop: 8,
-  },
-  playlistItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#333",
-  },
-  playlistItemName: {
-    fontSize: 16,
-    color: "#fff",
-    fontWeight: "500",
-  },
-  playlistItemDesc: {
-    fontSize: 12,
-    color: "#aaa",
-    marginTop: 2,
-  },
-  emptyPlaylistsText: {
-    color: "#888",
-    textAlign: "center",
-    marginTop: 20,
-    fontSize: 14,
-  },
+  // errorText
   errorText: {
     color: "#ff6b6b",
     fontSize: 11,
     marginBottom: 4,
   },
+
 
   // Title & artist
   trackTitle: {
@@ -1056,13 +1002,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: -0.2,
     marginBottom: 1,
-    marginRight: 30,
-    lineHeight: 25,
+    lineHeight: 24,
   },
   trackArtist: {
     color: "#888",
     fontSize: 15,
-    marginBottom: -10,
+    marginBottom: 0,
     fontWeight: "500",
   },
 

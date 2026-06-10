@@ -252,7 +252,12 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
       // RESTORE SESSION OR CLEAN UP
       const sessionTrack = await ServiceManager.enforceAppLifecycle();
       if (sessionTrack) {
-        setCurrentTrack(sessionTrack);
+        // Map TrackPlayer's `.id` → `.videoId` so MusicPlayerAdv can check
+        // savedVideoIds.has(currentTrack.videoId) correctly after a restore.
+        setCurrentTrack({
+          ...sessionTrack,
+          videoId: sessionTrack.videoId || sessionTrack.id || null,
+        });
       }
     } catch (e) {
       console.error("Error setting up player:", e);
@@ -537,7 +542,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#1DB954",
   },
   playButton: {
-    marginRight: 12,
+    marginLeft: 10,
+    marginRight: 10,
   },
   tapZone: {
     flex: 1,
