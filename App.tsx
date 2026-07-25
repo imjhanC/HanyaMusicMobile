@@ -35,7 +35,6 @@ import HomeSidebar from "./sidebars/HomeSidebar";
 import { AuthProvider, useAuth } from "./services/Auth/AuthProvider";
 import { LoginStateManager } from "./services/Auth/LoginStateManager";
 
-
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -44,7 +43,7 @@ const PlaylistStack = createNativeStackNavigator();
 const SPLASH_SHOWN_KEY = '@splash_shown';
 const RETRY_TIMEOUT = 1000;
 
-// Custom header with user icon
+// Top Bar
 function CustomHeader({ navigation }: any) {
   const { isAuthenticated, user } = useAuth();
 
@@ -116,7 +115,7 @@ export function BottomTabs() {
   );
 }
 
-// Home nested stack — gives Home sub-screens the bottom tab bar
+// Home page Stack
 function HomeStackNavigator() {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
@@ -131,7 +130,6 @@ function HomeStackNavigator() {
   );
 }
 
-// Playlist nested stack
 function PlaylistStackNavigator() {
   return (
     <PlaylistStack.Navigator screenOptions={{ headerShown: false }}>
@@ -141,13 +139,11 @@ function PlaylistStackNavigator() {
   );
 }
 
-// Stack Navigator wrapping the tabs
 function MainStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeDrawer" component={HomeSidebar} />
       <Stack.Screen name="SearchAdv" component={SearchScreenAdv} />
-      {/* FULL SCREEN LOGIN SCREEN */}
       <Stack.Screen
         name="Login"
         component={LoginScreen}
@@ -186,6 +182,7 @@ export default function App() {
     checkSplashStatus();
   }, []);
 
+  // Check if users's phone has no internet 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
       const connected = state.isConnected && state.isInternetReachable !== false;
@@ -200,6 +197,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Handle retry connection to the HANYAMUSIC server
   const handleRetry = async () => {
     setIsCheckingConnection(true);
     try {

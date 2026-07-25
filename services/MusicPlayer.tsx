@@ -123,6 +123,9 @@ export const GlobalMusicPlayer = ({ drawerProgress }: { drawerProgress: any }) =
             <Text style={styles.playerArtist} numberOfLines={1}>
               {currentTrack.uploader || currentTrack.artist || "Unknown Artist"}
             </Text>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${(position / duration) * 100 || 0}%` }]} />
+            </View>
           </View>
         </TouchableOpacity>
         <TouchableOpacity
@@ -134,14 +137,11 @@ export const GlobalMusicPlayer = ({ drawerProgress }: { drawerProgress: any }) =
           {showLoading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : isToggling ? (
-            <Ionicons name="hourglass" size={28} color="#999" />
+            <Ionicons name="hourglass" size={24} color="#999" />
           ) : (
-            <Ionicons name={isPlaying ? "pause" : "play"} size={32} color="#fff" style={styles.playButton} />
+            <Ionicons name={isPlaying ? "pause" : "play"} size={26} color="#fff" style={styles.playButton} />
           )}
         </TouchableOpacity>
-      </View>
-      <View style={styles.progressContainer}>
-        <View style={[styles.progressBar, { width: `${(position / duration) * 100 || 0}%` }]} />
       </View>
     </Animated.View>
   );
@@ -276,7 +276,7 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
       for (let i = 0; i < steps; i++) {
         const newVolume = Math.max(0, 1 - (volumeDecrement * (i + 1)));
         await TrackPlayer.setVolume(newVolume);
-        await new Promise(resolve => setTimeout(resolve, stepDuration));
+        await new Promise<void>(resolve => setTimeout(() => resolve(), stepDuration));
       }
 
       await TrackPlayer.pause();
@@ -299,7 +299,7 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
       for (let i = 0; i < steps; i++) {
         const newVolume = Math.min(1, volumeIncrement * (i + 1));
         await TrackPlayer.setVolume(newVolume);
-        await new Promise(resolve => setTimeout(resolve, stepDuration));
+        await new Promise<void>(resolve => setTimeout(() => resolve(), stepDuration));
       }
 
       await TrackPlayer.setVolume(1);
@@ -411,8 +411,6 @@ export const MusicPlayerProvider = ({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     setupPlayer();
-    // Intentionally removed TrackPlayer.reset() from cleanup 
-    // to allow background playback to persist when app is minimized/closed
     return () => { };
   }, []);
 
@@ -489,12 +487,30 @@ export const MarqueeTitle = ({ text, textStyle, style }: { text: string; textSty
 const styles = StyleSheet.create({
   globalPlayerWrapper: {
     position: "absolute",
-    bottom: 80,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(32, 32, 32, 0.98)",
-    borderTopWidth: 1,
-    borderTopColor: "#333",
+    bottom: 99,
+    left: 12,
+    right: 12,
+    backgroundColor: "rgba(28, 28, 30, 0.97)",
+    borderRadius: 22,
+    // Soft elevation so the pill visually lifts off the content behind it.
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  globalPlayerWrapperBottom: {
+    position: "absolute",
+    bottom: 16,
+    left: 12,
+    right: 12,
+    backgroundColor: "rgba(28, 28, 30, 0.97)",
+    borderRadius: 22,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
   globalPlayerContainer: {
     flexDirection: "row",
@@ -502,10 +518,10 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   playerThumbnail: {
-    width: 55,
-    height: 55,
-    borderRadius: 6,
-    marginRight: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    marginRight: 10,
   },
   playerInfo: {
     flex: 1,
@@ -513,50 +529,44 @@ const styles = StyleSheet.create({
   },
   playerTitle: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "bold",
-    marginTop: 4,
   },
   playerArtist: {
     color: "#aaa",
-    fontSize: 14,
+    fontSize: 12,
+    marginTop: 2,
     marginBottom: 6,
   },
   controlButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: "center",
     alignItems: "center",
+    marginLeft: 4,
   },
   controlButtonDisabled: {
-    backgroundColor: "#222",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
-  progressContainer: {
-    height: 4,
-    backgroundColor: "#333",
-    width: "100%",
+  progressTrack: {
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 2,
+    overflow: "hidden",
   },
-  progressBar: {
+  progressFill: {
     height: "100%",
     backgroundColor: "#1DB954",
+    borderRadius: 2,
   },
   playButton: {
-    marginLeft: 10,
-    marginRight: 10,
+    marginLeft: 2,
+    marginRight: 2,
   },
   tapZone: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-  },
-  globalPlayerWrapperBottom: {  // Add this new style
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(32, 32, 32, 0.98)",
-    borderTopWidth: 1,
-    borderTopColor: "#333",
   },
 });

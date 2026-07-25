@@ -48,7 +48,6 @@ function CustomDrawerContent(props: any) {
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
       <View style={styles.profileSection}>
-        {/* Frame with clipping - ensures image stays inside circle */}
         <View style={styles.avatarFrame}>
           {isAuthenticated && user?.avatar_url ? (
             <Image
@@ -130,12 +129,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#333",
   },
-  // Outer decorative frame – now with overflow hidden to clip the image
   avatarFrame: {
     width: 112,
     height: 112,
     borderRadius: 56,
-    overflow: "hidden", // <-- CRITICAL: clips the inner image to the circle
+    overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
@@ -148,14 +146,12 @@ const styles = StyleSheet.create({
     // Gold border
     borderWidth: 2.5,
     borderColor: "#FFD700",
-    backgroundColor: "#333", // fallback background
+    backgroundColor: "#333",
   },
-  // The actual image – fills the entire frame
   avatarImage: {
     width: "100%",
     height: "100%",
   },
-  // Placeholder when no avatar
   avatarPlaceholder: {
     width: "100%",
     height: "100%",

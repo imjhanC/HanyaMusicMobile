@@ -355,7 +355,7 @@ export default function RegAccScreen() {
     return (
         <SafeAreaView style={styles.safeArea}>
             {/* Animated background */}
-            <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
                 {ICONS_DATA.map((item) => (
                     <FloatingIcon key={item.id} {...item} />
                 ))}

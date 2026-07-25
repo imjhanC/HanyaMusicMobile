@@ -416,7 +416,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#1a1060",
     borderRadius: 14,
     padding: 14,
-    marginBottom: 24,
+    marginTop: 20,
+    marginBottom: 20,
     gap: 12,
   },
   likedIconWrap: {

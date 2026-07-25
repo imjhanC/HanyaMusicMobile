@@ -926,9 +926,8 @@ const styles = StyleSheet.create({
   },
   infoLeft: {
     flex: 1,
-    minWidth: 0, // critical: lets flex children shrink below their natural width
+    minWidth: 0,
     alignItems: "flex-start",
-    overflow: "hidden", // clip the marquee animation at the container edge
   },
   addBtn: {
     width: 40,
@@ -965,13 +964,18 @@ const styles = StyleSheet.create({
   },
   dropdownMenu: {
     position: "absolute",
-    top: 36,
+    top: 26,
     left: 0,
     backgroundColor: "#1e1e1e",
     borderRadius: 8,
     paddingVertical: 8,
     width: 140,
-    elevation: 5,
+    zIndex: 9999,
+    elevation: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
   },
   dropdownItem: {
     flexDirection: "row",

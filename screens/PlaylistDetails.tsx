@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert, Platform } from "react-native";
+import LinearGradient from "react-native-linear-gradient";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { launchImageLibrary } from "react-native-image-picker";
 import { PlaylistApi, TrackResponse, PlaylistResponse } from "../services/PlaylistApi";
 import { useMusicPlayer } from "../services/MusicPlayer";
 import { useAuth } from "../services/Auth/AuthProvider";
@@ -20,6 +22,7 @@ export default function PlaylistDetails() {
   const [playlist, setPlaylist] = useState<PlaylistResponse | null>(null);
   const [tracks, setTracks] = useState<TrackResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
   const { playTrack, setQueue, currentTrack } = useMusicPlayer();
   const { user } = useAuth();
@@ -59,6 +62,36 @@ export default function PlaylistDetails() {
     } catch (error) {
       console.error("Error playing track", error);
     }
+  };
+
+  const handleChangeImage = () => {
+    if (!isOwner) return;
+    launchImageLibrary(
+      { mediaType: "photo", quality: 0.8, selectionLimit: 1 },
+      async (response) => {
+        if (response.didCancel || !response.assets || response.assets.length === 0) return;
+        const asset = response.assets[0];
+        if (!asset.uri) return;
+        try {
+          setUploading(true);
+          const updated = await PlaylistApi.updatePlaylist(
+            playlistId,
+            undefined,
+            undefined,
+            undefined,
+            asset.uri,
+            asset.type || "image/jpeg",
+            asset.fileName || "cover.jpg"
+          );
+          setPlaylist(updated);
+        } catch (error) {
+          console.error("Failed to update playlist image", error);
+          Alert.alert("Error", "Could not update playlist image");
+        } finally {
+          setUploading(false);
+        }
+      }
+    );
   };
 
   const handlePlayAll = () => {
@@ -108,6 +141,7 @@ export default function PlaylistDetails() {
 
   const isOwner = user?.id === playlist.user_id;
 
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -123,13 +157,67 @@ export default function PlaylistDetails() {
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View style={styles.playlistInfoContainer}>
-            <View style={styles.playlistImageFallback}>
-              {playlist.image_url ? (
-                <Image source={{ uri: playlist.image_url }} style={styles.playlistImage} />
-              ) : (
-                <Ionicons name="musical-notes" size={60} color="#666" />
+            {/* ── Cover Art ── */}
+            <View style={styles.coverWrapper}>
+              {/* Glow ring */}
+              <View style={[
+                styles.glowRing,
+                isOwner && { borderColor: uploading ? "#666" : "#1DB954" }
+              ]} />
+
+              <TouchableOpacity
+                style={styles.coverTouchable}
+                onPress={isOwner ? handleChangeImage : undefined}
+                activeOpacity={isOwner ? 0.85 : 1}
+                disabled={uploading}
+              >
+                {/* Artwork or placeholder */}
+                {playlist.image_url ? (
+                  <Image source={{ uri: playlist.image_url }} style={styles.coverImage} />
+                ) : (
+                  <LinearGradient
+                    colors={["#1a1a2e", "#16213e", "#0f3460"]}
+                    style={styles.coverPlaceholder}
+                  >
+                    <Ionicons name="musical-notes" size={72} color="rgba(255,255,255,0.18)" />
+                  </LinearGradient>
+                )}
+
+                {/* Dark gradient overlay for owner */}
+                {isOwner && (
+                  <LinearGradient
+                    colors={["transparent", "rgba(0,0,0,0.72)"]}
+                    style={styles.coverGradientOverlay}
+                  >
+                    {uploading ? (
+                      <ActivityIndicator size="large" color="#1DB954" />
+                    ) : (
+                      <View style={styles.cameraHintRow}>
+                        <View style={styles.cameraBadge}>
+                          <Ionicons name="camera" size={20} color="#fff" />
+                        </View>
+                        <Text style={styles.changePhotoLabel}>Change Cover</Text>
+                      </View>
+                    )}
+                  </LinearGradient>
+                )}
+              </TouchableOpacity>
+
+              {/* Floating upload badge (top-right corner) */}
+              {isOwner && !uploading && (
+                <View style={styles.editBadge}>
+                  <Ionicons name="pencil" size={11} color="#fff" />
+                </View>
               )}
             </View>
+
+            {/* Tap hint below image */}
+            {isOwner && (
+              <Text style={styles.tapHint}>
+                {uploading ? "Uploading…" : "Tap cover to change"}
+              </Text>
+            )}
+
             <Text style={styles.playlistTitle}>{playlist.name}</Text>
             {playlist.description ? (
               <Text style={styles.playlistDescription}>{playlist.description}</Text>
@@ -141,7 +229,7 @@ export default function PlaylistDetails() {
               onPress={handlePlayAll}
               disabled={tracks.length === 0}
             >
-              <Ionicons name="play" size={24} color="#000" />
+              <Ionicons name="play" size={22} color="#000" />
               <Text style={styles.playAllText}>Play All</Text>
             </TouchableOpacity>
           </View>
@@ -214,27 +302,114 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    paddingBottom: 100, // Space for player
+    paddingBottom: 170, // Space for player
   },
   playlistInfoContainer: {
     alignItems: "center",
-    paddingVertical: 20,
+    paddingTop: 28,
+    paddingBottom: 20,
     paddingHorizontal: 16,
   },
-  playlistImageFallback: {
-    width: 160,
-    height: 160,
-    backgroundColor: "#2a2a2a",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 8,
-    marginBottom: 16,
-    elevation: 5,
+  // ── Cover art wrapper
+  coverWrapper: {
+    position: "relative",
+    marginBottom: 6,
   },
-  playlistImage: {
+  glowRing: {
+    position: "absolute",
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "transparent",
+    // shadow for the glow effect
+    ...Platform.select({
+      android: { elevation: 12 },
+      ios: {
+        shadowColor: "#1DB954",
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.55,
+        shadowRadius: 12,
+      },
+    }),
+  },
+  coverTouchable: {
+    width: 200,
+    height: 200,
+    borderRadius: 16,
+    overflow: "hidden",
+    // card shadow
+    ...Platform.select({
+      android: { elevation: 16 },
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.6,
+        shadowRadius: 16,
+      },
+    }),
+  },
+  coverImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 8,
+  },
+  coverPlaceholder: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  coverGradientOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 80,
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingBottom: 12,
+  },
+  cameraHintRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  cameraBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(29,185,84,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  changePhotoLabel: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+  editBadge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#1DB954",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#121212",
+  },
+  tapHint: {
+    fontSize: 11,
+    color: "#1DB954",
+    marginTop: 10,
+    marginBottom: 4,
+    letterSpacing: 0.4,
+    opacity: 0.85,
   },
   playlistTitle: {
     fontSize: 24,

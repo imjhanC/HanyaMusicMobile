@@ -210,7 +210,7 @@ export default function VisualizerPlayer({ isPlaying }: { isPlaying: boolean }) 
 
         {/* ── Peak-dot overlay — rendered last so it's always on top ── */}
         {isPlaying && (
-          <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
             {columnAnims.map((anim, colIndex) => (
               <PeakDot
                 key={colIndex}

@@ -4,7 +4,8 @@
       "strict": true,
       "allowJs": true,
       "esModuleInterop": true,
-      "jsx": "react-native"
+      "jsx": "react-native",
+      "types": []
   },
   "include": [
     "env.d.ts",

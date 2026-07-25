@@ -98,8 +98,6 @@ const Home = () => {
   const fetchHomeData = async () => {
     try {
       setData(prev => ({ ...prev, isLoading: true, errorMessage: null }));
-
-      // Providers and multi-service geolocation strategy
       const fetchGeoInfo = async () => {
         const providers = [
           { url: 'http://ip-api.com/json', code: 'countryCode', name: 'country' }
@@ -122,41 +120,28 @@ const Home = () => {
         return null;
       };
 
-      // 1. Start fetching API URL (force fresh) and Geolocation in parallel
       const apiUrlPromise = ServiceManager.getHanyaMusicUrl(true);
       const geoPromise = fetchGeoInfo();
-
-      // 2. Start fetching artists and global songs AS SOON AS the API URL is ready
-      // (Don't wait for geolocation!)
       const artistsPromise = apiUrlPromise.then(url => fetch(`${url}/topglobalartists`));
       const globalSongsPromise = apiUrlPromise.then(url => fetch(`${url}/topglobalsongs`));
-
-      // 3. Wait for BOTH API URL and Geo to fetch country-specific songs
       const countrySongsPromise = Promise.all([apiUrlPromise, geoPromise]).then(async ([url, geo]) => {
         let detectedCountryCode = "US";
         if (geo) {
           detectedCountryCode = geo.code;
         } else {
-          // Fallback if geo fails
           const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
           if (tz === "Asia/Kuala_Lumpur") detectedCountryCode = "MY";
         }
         return fetch(`${url}/topcountrysongs/${detectedCountryCode}`);
       });
-
-      // 4. Wait for all requests to complete
       const [artistsResponse, globalSongsResponse, countrySongsResponse, geoResult] = await Promise.all([
         artistsPromise,
         globalSongsPromise,
         countrySongsPromise,
         geoPromise
       ]);
-
-      // Set country info for UI
       setCountryCode(geoResult?.code || "US");
       setCountryName(geoResult?.name || (Intl.DateTimeFormat().resolvedOptions().timeZone === "Asia/Kuala_Lumpur" ? "Malaysia" : "United States"));
-
-      // Check each response individually for better error reporting
       if (!artistsResponse.ok) throw new Error(`Artists API error: ${artistsResponse.status}`);
       if (!globalSongsResponse.ok) throw new Error(`Global Songs API error: ${globalSongsResponse.status}`);
       if (!countrySongsResponse.ok) throw new Error(`Country Songs API error: ${countrySongsResponse.status}`);

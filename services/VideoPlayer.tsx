@@ -137,13 +137,13 @@ export default function VideoPlayer({
                 {/* Video — taps toggle controls */}
                 <TouchableOpacity
                     activeOpacity={1}
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                     onPress={bumpControls}
                 >
                     <Video
                         ref={videoRef}
                         source={{ uri: mvData.stream_url }}
-                        style={StyleSheet.absoluteFillObject}
+                        style={StyleSheet.absoluteFill}
                         muted={false}          // stream_url = video+audio combined
                         paused={!isPlaying}
                         resizeMode={ResizeMode.CONTAIN}
