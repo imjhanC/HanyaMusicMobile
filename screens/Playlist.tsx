@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,12 +12,180 @@ import {
   Image,
   RefreshControl,
   SafeAreaView,
+  Animated,
+  Easing,
 } from "react-native";
+import LinearGradient from "react-native-linear-gradient";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { launchImageLibrary } from "react-native-image-picker";
 import { PlaylistApi, PlaylistResponse } from "../services/PlaylistApi";
 import { useAuth } from "../services/Auth/AuthProvider";
+
+const LoggedOutView = ({ navigation }: { navigation: any }) => {
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const noteFloat1 = useRef(new Animated.Value(0)).current;
+  const noteFloat2 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Card subtle floating
+    const float = Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -8,
+          duration: 2200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 2200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Glowing badge pulse
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.08,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Floating note 1
+    const note1 = Animated.loop(
+      Animated.sequence([
+        Animated.timing(noteFloat1, {
+          toValue: -12,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(noteFloat1, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Floating note 2
+    const note2 = Animated.loop(
+      Animated.sequence([
+        Animated.timing(noteFloat2, {
+          toValue: -15,
+          duration: 1900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(noteFloat2, {
+          toValue: 0,
+          duration: 1900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    float.start();
+    pulse.start();
+    note1.start();
+    note2.start();
+
+    return () => {
+      float.stop();
+      pulse.stop();
+      note1.stop();
+      note2.stop();
+    };
+  }, []);
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <LinearGradient
+        colors={["#160c28", "#0e0e17", "#0a0a0f"]}
+        style={styles.loggedOutGradient}
+      >
+        <Animated.View style={[styles.glassCard, { transform: [{ translateY: floatAnim }] }]}>
+          {/* Decorative Floating Notes */}
+          <Animated.View style={[styles.floatingNoteLeft, { transform: [{ translateY: noteFloat1 }] }]}>
+            <Ionicons name="musical-note" size={24} color="rgba(29, 185, 84, 0.4)" />
+          </Animated.View>
+          <Animated.View style={[styles.floatingNoteRight, { transform: [{ translateY: noteFloat2 }] }]}>
+            <Ionicons name="musical-notes" size={28} color="rgba(168, 85, 247, 0.4)" />
+          </Animated.View>
+
+          {/* Main Icon Badge */}
+          <Animated.View style={[styles.iconBadgeWrapper, { transform: [{ scale: pulseAnim }] }]}>
+            <LinearGradient
+              colors={["#2e155b", "#140a28"]}
+              style={styles.iconBadgeGradient}
+            >
+              <Ionicons name="library-outline" size={54} color="#1DB954" />
+            </LinearGradient>
+          </Animated.View>
+
+          {/* Title & Subtitle */}
+          <Text style={styles.glassCardTitle}>Your Library Awaits</Text>
+          <Text style={styles.glassCardSubtitle}>
+            Log in to unlock your custom playlists, saved tracks, and personalized recommendations.
+          </Text>
+
+          {/* Feature Badges */}
+          <View style={styles.featuresContainer}>
+            <View style={styles.featurePill}>
+              <Ionicons name="heart" size={15} color="#1DB954" style={{ marginRight: 8 }} />
+              <Text style={styles.featurePillText}>Save Liked Songs</Text>
+            </View>
+            <View style={styles.featurePill}>
+              <Ionicons name="add-circle" size={15} color="#a855f7" style={{ marginRight: 8 }} />
+              <Text style={styles.featurePillText}>Create Custom Playlists</Text>
+            </View>
+            <View style={styles.featurePill}>
+              <Ionicons name="sync" size={15} color="#3b82f6" style={{ marginRight: 8 }} />
+              <Text style={styles.featurePillText}>Sync Everywhere</Text>
+            </View>
+          </View>
+
+          {/* Dual Action Buttons */}
+          <View style={styles.buttonGroup}>
+            <TouchableOpacity
+              style={styles.btnPrimary}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate("Login")}
+            >
+              {/* <Ionicons name="log-in-outline" size={20} color="#000" style={{ marginRight: 8 }} /> */}
+              <Text style={styles.btnPrimaryText}>Sign In</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.btnSecondary}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate("RegAccScreen")}
+            >
+              {/* <Ionicons name="person-add-outline" size={18} color="#fff" style={{ marginRight: 8 }} /> */}
+              <Text style={styles.btnSecondaryText}>Create Account</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </LinearGradient>
+    </SafeAreaView>
+  );
+};
 
 const LIKED_SONGS_NAME = "Liked Songs";
 
@@ -171,13 +339,7 @@ const Playlist = () => {
   );
 
   if (!isAuthenticated) {
-    return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="lock-closed-outline" size={40} color="#333" />
-        <Text style={styles.emptyTitle}>Sign in to see your playlists</Text>
-        <Text style={styles.emptySubtitle}>Your music library will appear here</Text>
-      </View>
-    );
+    return <LoggedOutView navigation={navigation} />;
   }
 
   return (
@@ -611,6 +773,130 @@ const styles = StyleSheet.create({
   },
   btnSaveText: {
     color: "#000",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  // Logged-out Glassmorphic Card Styles
+  loggedOutGradient: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  glassCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderRadius: 28,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  floatingNoteLeft: {
+    position: "absolute",
+    top: 24,
+    left: 24,
+  },
+  floatingNoteRight: {
+    position: "absolute",
+    top: 36,
+    right: 24,
+  },
+  iconBadgeWrapper: {
+    marginBottom: 20,
+    borderRadius: 55,
+    shadowColor: "#1DB954",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  iconBadgeGradient: {
+    width: 106,
+    height: 106,
+    borderRadius: 53,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "rgba(29, 185, 84, 0.35)",
+  },
+  glassCardTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginBottom: 8,
+    letterSpacing: -0.4,
+  },
+  glassCardSubtitle: {
+    fontSize: 14,
+    color: "#B3B3B3",
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  featuresContainer: {
+    width: "100%",
+    gap: 8,
+    marginBottom: 28,
+  },
+  featurePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+  },
+  featurePillText: {
+    color: "#E0E0E0",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  buttonGroup: {
+    width: "100%",
+    gap: 12,
+  },
+  btnPrimary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#1DB954",
+    paddingVertical: 14,
+    borderRadius: 30,
+    shadowColor: "#1DB954",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  btnPrimaryText: {
+    color: "#000000",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  btnSecondary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    paddingVertical: 14,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+  },
+  btnSecondaryText: {
+    color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "600",
   },

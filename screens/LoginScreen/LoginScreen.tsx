@@ -288,7 +288,6 @@ export default function LoginScreen() {
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
         >
-          {/* LOGO - centered */}
           <View style={styles.header}>
             <View style={{ flexDirection: "row" }}>
               <Text style={styles.hanya}>Hanya</Text>
@@ -296,8 +295,6 @@ export default function LoginScreen() {
             </View>
             <Text style={styles.subtitle}>Your music, your way</Text>
           </View>
-
-          {/* FORM CARD - centered */}
           <View style={styles.card}>
             <Text style={styles.title}>Welcome Back</Text>
 
@@ -483,7 +480,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#000",
     fontWeight: "800",
-    fontSize: 16,
+    fontSize: 21,
     letterSpacing: 0.5,
   },
   footerContainer: {
